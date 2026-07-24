@@ -1,0 +1,41 @@
+name = "relfi-games"
+main = "src/index.ts"
+compatibility_date = "2025-02-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "relfi-games"
+database_id = "a9a82f45-b9c0-4b10-9b14-dc40018e4daf"
+migrations_dir = "migrations"
+
+[[kv_namespaces]]
+binding = "RELFI_ROOM_CODES"
+id = "3309923f4b974e3689a3d369edb392a4"
+
+[[kv_namespaces]]
+binding = "RELFI_WS_TICKETS"
+id = "21f028498d3c4afd939e3b456816480b"
+
+[[kv_namespaces]]
+binding = "RELFI_MAGIC_TOKENS"
+id = "410b59960b8347579bdaa242b2133c4d"
+
+[[kv_namespaces]]
+binding = "RELFI_RATE_LIMITS"
+id = "1d0e7d5588494f948ef151b0f5236069"
+
+[[r2_buckets]]
+binding = "ASSETS"
+bucket_name = "relfi-assets"
+
+[[durable_objects.bindings]]
+name = "ROOM_STATE"
+class_name = "RoomState"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RoomState"]
+
+[env]
+[env.production]

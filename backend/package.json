@@ -1,0 +1,27 @@
+{
+  "name": "relfi-games-backend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "migrate": "wrangler d1 migrations apply relfi-games",
+    "migrate:local": "wrangler d1 migrations apply relfi-games --local",
+    "types": "wrangler types",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "hono": "^4.7.7",
+    "@hono/zod-validator": "^0.4.3",
+    "jose": "^6.0.10",
+    "nanoid": "^5.1.5",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250416.0",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.2",
+    "wrangler": "^4.113.0"
+  }
+}
