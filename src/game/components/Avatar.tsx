@@ -5,12 +5,14 @@ export function Avatar({
   hue,
   size = 40,
   connected = true,
+  avatarUrl,
   className,
 }: {
   name: string;
   hue: number;
   size?: number;
   connected?: boolean;
+  avatarUrl?: string;
   className?: string;
 }) {
   const initials = name
@@ -21,17 +23,26 @@ export function Avatar({
     .toUpperCase();
   return (
     <div className={cn("relative inline-flex shrink-0", className)} style={{ width: size, height: size }}>
-      <div
-        className="grid h-full w-full place-items-center rounded-full font-display font-semibold"
-        style={{
-          background: `linear-gradient(135deg, hsl(${hue} 70% 55%), hsl(${(hue + 40) % 360} 80% 40%))`,
-          color: "white",
-          fontSize: size * 0.4,
-          boxShadow: `0 6px 20px -6px hsl(${hue} 70% 40% / 0.6)`,
-        }}
-      >
-        {initials}
-      </div>
+      {avatarUrl ? (
+        <img
+          src={avatarUrl}
+          alt={name}
+          className="h-full w-full rounded-full object-cover"
+          style={{ boxShadow: `0 6px 20px -6px hsl(${hue} 70% 40% / 0.6)` }}
+        />
+      ) : (
+        <div
+          className="grid h-full w-full place-items-center rounded-full font-display font-semibold"
+          style={{
+            background: `linear-gradient(135deg, hsl(${hue} 70% 55%), hsl(${(hue + 40) % 360} 80% 40%))`,
+            color: "white",
+            fontSize: size * 0.4,
+            boxShadow: `0 6px 20px -6px hsl(${hue} 70% 40% / 0.6)`,
+          }}
+        >
+          {initials}
+        </div>
+      )}
       <span
         className={cn(
           "absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2",

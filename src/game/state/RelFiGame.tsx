@@ -12,6 +12,7 @@ import { useGame } from "./store";
 import { useAuth } from "./auth-store";
 import { relfiSocket } from "../lib/ws";
 import { cn } from "@/game/lib/utils";
+import { Avatar } from "../components/Avatar";
 
 export type RelFiGameProps = {
   mode?: "standalone" | "embedded";
@@ -25,6 +26,7 @@ export function RelFiGame({ mode = "standalone", containerMode = "fullscreen" }:
   const applyWsEvent = useGame((s) => s.applyWsEvent);
   const resetGame = useGame((s) => s.resetGame);
   const tryReconnect = useGame((s) => s.tryReconnect);
+  const user = useAuth((s) => s.user);
   const loadSession = useAuth((s) => s.loadSession);
   const initialized = useAuth((s) => s.initialized);
 
@@ -58,7 +60,15 @@ export function RelFiGame({ mode = "standalone", containerMode = "fullscreen" }:
     >
       <div className="absolute inset-0 -z-10 bg-hero" />
 
-      <div className="fixed right-4 top-4 z-40">
+      <div className="fixed right-4 top-4 z-40 flex items-center gap-2">
+        {user && (
+          <Avatar
+            name={user.display_name}
+            hue={user.id.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 360}
+            size={32}
+            avatarUrl={user.avatar_url}
+          />
+        )}
         <SoundToggle />
       </div>
 
