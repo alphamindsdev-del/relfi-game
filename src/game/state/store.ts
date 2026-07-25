@@ -9,6 +9,7 @@ type Store = {
   phase: Phase
   roomCode: string
   roomId: string
+  hostUserId: string
   mode: 'solo' | 'seer_skeptic' | 'multiplayer_seer' | ''
   deckId: string
   statementText: string
@@ -33,6 +34,7 @@ type Store = {
   toggleSound: () => void
   connect: (roomId: string, ticket: string) => void
   disconnect: () => void
+  tryReconnect: () => boolean
   createAndHost: (deckId: string, mode: string) => Promise<void>
   joinByCode: (code: string) => Promise<void>
   startLocalGame: () => void
@@ -41,6 +43,7 @@ type Store = {
   lockIn: (playerId: string, categoryId: string) => void
   hostStartGame: () => void
   hostAdvanceRound: () => void
+  hostEndGame: () => void
   hostNextSpeaker: (userId: string) => void
   skepticDecision: (decision: 'follow' | 'bluff' | 'solo', trustedSeerId?: string) => void
   playerReady: () => void
@@ -52,6 +55,7 @@ export const useGame = create<Store>((set, get) => ({
   phase: 'landing',
   roomCode: '',
   roomId: '',
+  hostUserId: '',
   mode: '',
   deckId: '',
   statementText: '',
@@ -76,21 +80,40 @@ export const useGame = create<Store>((set, get) => ({
   toggleSound: () => set((s) => ({ soundOn: !s.soundOn })),
 
   connect: (roomId, ticket) => {
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem('relfi_room_id', roomId)
+      sessionStorage.setItem('relfi_ticket', ticket)
+    }
     set({ roomId, connected: false, error: null })
     relfiSocket.connect(roomId, ticket)
   },
 
   disconnect: () => {
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.removeItem('relfi_room_id')
+      sessionStorage.removeItem('relfi_ticket')
+    }
     relfiSocket.disconnect()
-    set({ connected: false, players: [], round: {}, phase: 'landing', roomCode: '', roomId: '' })
+    set({ connected: false, players: [], round: {}, phase: 'landing', roomCode: '', roomId: '', hostUserId: '' })
+  },
+
+  tryReconnect: () => {
+    if (typeof sessionStorage === 'undefined') return false
+    const roomId = sessionStorage.getItem('relfi_room_id')
+    const ticket = sessionStorage.getItem('relfi_ticket')
+    if (roomId && ticket) {
+      get().connect(roomId, ticket)
+      return true
+    }
+    return false
   },
 
   createAndHost: async (deckId, mode) => {
     const { room_id, room_code } = await api.createRoom(deckId, mode)
     const { ticket } = await api.joinRoom(room_code)
     const user = useAuth.getState().user
-    set({ roomCode: room_code, roomId: room_id, deckId, mode: mode as any, phase: 'lobby', youId: user?.id || '' })
-    relfiSocket.connect(room_id, ticket)
+    set({ roomCode: room_code, roomId: room_id, hostUserId: user?.id || '', deckId, mode: mode as any, phase: 'lobby', youId: user?.id || '' })
+    get().connect(room_id, ticket)
   },
 
   joinByCode: async (code) => {
@@ -99,7 +122,7 @@ export const useGame = create<Store>((set, get) => ({
     const { room_id, ticket } = await api.joinRoom(upper)
     const user = useAuth.getState().user
     set({ roomCode: upper, roomId: room_id, mode: room.mode as any, phase: 'lobby', youId: user?.id || '' })
-    relfiSocket.connect(room_id, ticket)
+    get().connect(room_id, ticket)
   },
 
   startLocalGame: () => set({ phase: 'lobby' }),
@@ -118,6 +141,7 @@ export const useGame = create<Store>((set, get) => ({
 
   hostStartGame: () => relfiSocket.send({ type: 'host:start_game' }),
   hostAdvanceRound: () => relfiSocket.send({ type: 'host:advance_round' }),
+  hostEndGame: () => relfiSocket.send({ type: 'host:end_game' }),
   hostNextSpeaker: (userId) => relfiSocket.send({ type: 'host:next_speaker', userId }),
 
   skepticDecision: (decision, trustedSeerId) => {
@@ -127,9 +151,13 @@ export const useGame = create<Store>((set, get) => ({
   playerReady: () => relfiSocket.send({ type: 'player:ready' }),
 
   resetGame: () => {
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.removeItem('relfi_room_id')
+      sessionStorage.removeItem('relfi_ticket')
+    }
     relfiSocket.disconnect()
     set({
-      phase: 'landing', roomCode: '', roomId: '', connected: false,
+      phase: 'landing', roomCode: '', roomId: '', hostUserId: '', connected: false,
       players: [], round: {}, categories: [], youRole: null, clue: null,
       roundIndex: 0, standings: [], finalStandings: [], error: null,
     })
@@ -144,7 +172,7 @@ export const useGame = create<Store>((set, get) => ({
           tokens: p.tokens || 0, connected: p.connected, ready: p.ready,
         }))
         set({
-          roomCode: s.code, roomId: s.roomId, mode: s.mode, deckId: s.deckId,
+          roomCode: s.code, roomId: s.roomId, hostUserId: s.hostUserId || '', mode: s.mode, deckId: s.deckId,
           players, phase: mapPhase(s.phase), roundIndex: s.roundIndex || 0,
           categories: (s.categoryOptions || []).map(apiCategoryToCategory), connected: true,
         })

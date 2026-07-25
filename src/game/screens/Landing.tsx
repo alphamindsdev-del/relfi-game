@@ -28,12 +28,28 @@ export function Landing() {
   const [selectedMode, setSelectedMode] = useState<"seer_skeptic" | "multiplayer_seer" | "solo">("seer_skeptic");
   const [loading, setLoading] = useState(false);
   const [joinError, setJoinError] = useState("");
+  const [pendingJoinCode, setPendingJoinCode] = useState("");
+  const initialized = useAuth((s) => s.initialized);
 
   useEffect(() => {
     if (mode === "host" && user) {
       api.getDecks(true).then(setDecks).catch(() => {})
     }
   }, [mode, user])
+
+  useEffect(() => {
+    if (!initialized) return
+    const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '')
+    const joinCode = params.get('join')
+    if (joinCode && joinCode.length === 5) {
+      if (user) {
+        joinByCode(joinCode).catch(() => setMode('join'))
+      } else {
+        setPendingJoinCode(joinCode)
+        setMode('login')
+      }
+    }
+  }, [initialized])
 
   function handleHost() {
     unlockAudio()
@@ -78,7 +94,13 @@ export function Landing() {
     setAuthError("")
     try {
       await login(email, password)
-      setMode("idle")
+      if (pendingJoinCode) {
+        const code = pendingJoinCode
+        setPendingJoinCode("")
+        await joinByCode(code)
+      } else {
+        setMode("idle")
+      }
     } catch (e: any) {
       setAuthError(e.message || "Login failed")
     }
@@ -89,7 +111,13 @@ export function Landing() {
     setAuthError("")
     try {
       await signup(email, password, displayName)
-      setMode("idle")
+      if (pendingJoinCode) {
+        const code = pendingJoinCode
+        setPendingJoinCode("")
+        await joinByCode(code)
+      } else {
+        setMode("idle")
+      }
     } catch (e: any) {
       setAuthError(e.message || "Signup failed")
     }

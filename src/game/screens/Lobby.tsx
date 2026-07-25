@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Play, Users } from "lucide-react";
+import { Play, Users, LogOut } from "lucide-react";
 import { useGame } from "../state/store";
 import { useAuth } from "../state/auth-store";
 import { RoomCodeDisplay } from "../components/RoomCodeDisplay";
@@ -12,7 +12,10 @@ export function Lobby() {
   const hostStartGame = useGame((s) => s.hostStartGame);
   const playerReady = useGame((s) => s.playerReady);
   const user = useAuth((s) => s.user);
+  const youReady = players.find((p) => user && p.id === user.id)?.ready ?? false;
   const canStart = players.length >= 2 && connected;
+
+  const resetGame = useGame((s) => s.resetGame);
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-6 py-12">
@@ -21,10 +24,18 @@ export function Lobby() {
           <div className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Waiting room</div>
           <h1 className="font-display text-3xl font-bold md:text-4xl">Get everyone in</h1>
         </div>
-        <div className="hidden text-right md:block">
-          <div className="text-xs uppercase tracking-widest text-muted-foreground">Mode</div>
-          <div className="font-display text-lg">Online</div>
-          <div className="text-xs text-muted-foreground">{players.length} {players.length === 1 ? 'player' : 'players'}</div>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={resetGame}
+            className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-card"
+          >
+            <LogOut className="h-3.5 w-3.5" /> Leave
+          </button>
+          <div className="hidden text-right md:block">
+            <div className="text-xs uppercase tracking-widest text-muted-foreground">Mode</div>
+            <div className="font-display text-lg">Online</div>
+            <div className="text-xs text-muted-foreground">{players.length} {players.length === 1 ? 'player' : 'players'}</div>
+          </div>
         </div>
       </div>
 
@@ -63,9 +74,11 @@ export function Lobby() {
       <div className="mt-auto pt-10 flex gap-3">
         <button
           onClick={playerReady}
-          className="inline-flex flex-1 items-center justify-center gap-3 rounded-2xl border px-8 py-5 font-display text-base font-bold hover:bg-card"
+          className={`inline-flex flex-1 items-center justify-center gap-3 rounded-2xl border px-8 py-5 font-display text-base font-bold ${
+            youReady ? "bg-primary/20 border-primary text-primary" : "hover:bg-card"
+          }`}
         >
-          Ready up
+          {youReady ? "Ready!" : "Ready up"}
         </button>
         <button
           onClick={hostStartGame}

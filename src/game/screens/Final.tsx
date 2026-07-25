@@ -78,7 +78,7 @@ export function Final() {
           onClick={resetGame}
           className="inline-flex items-center gap-2 rounded-full border px-6 py-3 font-display font-semibold uppercase tracking-widest hover:bg-card"
         >
-          <Home className="h-4 w-4" /> Back to lobby
+          <Home className="h-4 w-4" /> Back to home
         </button>
       </div>
     </div>

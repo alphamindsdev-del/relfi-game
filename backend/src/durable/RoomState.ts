@@ -191,7 +191,6 @@ export class RoomState extends DurableObject {
         existing.connected = true
         existing.disconnectedAt = undefined
         this.broadcast({ type: 'player:connection', userId, status: 'reconnecting' })
-        this.sendTo(server, { type: 'room:state', state: this.getSanitizedState() })
 
         if (existing.role === 'seer' && this.storage.phase === 'statement_revealed') {
           this.sendSeerClue(server)
@@ -218,10 +217,8 @@ export class RoomState extends DurableObject {
 
     this.sockets.set(userId, server)
 
-    // Newly connected player gets the full state even if they just joined
-    if (!this.storage.players.find((p) => p.userId === userId)?.connected) {
-      this.sendTo(server, { type: 'room:state', state: this.getSanitizedState() })
-    }
+    // Every connecting player gets the full room state
+    this.sendTo(server, { type: 'room:state', state: this.getSanitizedState() })
 
     server.addEventListener('message', async (msg: MessageEvent) => {
       try {
@@ -283,6 +280,15 @@ export class RoomState extends DurableObject {
         break
       }
 
+      case 'host:end_game': {
+        if (userId !== this.storage.hostUserId) return
+        this.storage.phase = 'game_ended'
+        const standings = this.getStandings()
+        this.broadcast({ type: 'game:ended', finalStandings: standings })
+        await this.flushToD1()
+        break
+      }
+
       case 'player:lock_answer': {
         const player = this.storage.players.find((p) => p.userId === userId)
         if (!player || player.locked) return
@@ -290,8 +296,8 @@ export class RoomState extends DurableObject {
         player.pick = event.category_id
         this.broadcast({ type: 'player:locked', userId })
 
-        const nonSeers = this.storage.players.filter((p) => p.connected && p.role !== 'seer')
-        const allLocked = nonSeers.length === 0 || nonSeers.every((p) => p.locked)
+        const connected = this.storage.players.filter((p) => p.connected)
+        const allLocked = connected.length === 0 || connected.every((p) => p.locked)
         if (allLocked || this.storage.mode === 'solo') await this.doReveal()
         break
       }

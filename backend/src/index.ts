@@ -39,6 +39,8 @@ app.use('*', cors({
     const allowed = [
       'https://relfigames.com',
       'https://*.alphaminds.com',
+      'https://*.workers.dev',
+      'https://*.pages.dev',
       'http://localhost:5173',
       'http://localhost:8080',
       'http://127.0.0.1:5173',
@@ -46,8 +48,8 @@ app.use('*', cors({
     ]
     if (allowed.some((a) => {
       if (a.includes('*')) {
-        const pattern = a.replace('*.', '')
-        return origin.endsWith(pattern)
+        const suffix = a.split('*')[1]
+        return origin.endsWith(suffix)
       }
       return origin === a
     })) return origin

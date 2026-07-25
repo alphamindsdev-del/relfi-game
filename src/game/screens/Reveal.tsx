@@ -1,10 +1,11 @@
 import { useEffect } from "react";
 import { motion } from "framer-motion";
-import { Check, X, ArrowRight } from "lucide-react";
+import { Check, X, ArrowRight, LogOut, XCircle } from "lucide-react";
 import { CategoryChip } from "../components/CategoryChip";
 import { Avatar } from "../components/Avatar";
 import { TokenCounter } from "../components/TokenCounter";
 import { useGame } from "../state/store";
+import { useAuth } from "../state/auth-store";
 import { sfx } from "../audio/sound";
 
 export function Reveal() {
@@ -12,9 +13,13 @@ export function Reveal() {
   const players = useGame((s) => s.players);
   const round = useGame((s) => s.round);
   const hostAdvanceRound = useGame((s) => s.hostAdvanceRound);
+  const hostEndGame = useGame((s) => s.hostEndGame);
+  const resetGame = useGame((s) => s.resetGame);
+  const hostUserId = useGame((s) => s.hostUserId);
   const soundOn = useGame((s) => s.soundOn);
   const revealData = useGame((s) => s.revealData);
   const frictionExplanation = useGame((s) => s.frictionExplanation);
+  const user = useAuth((s) => s.user);
 
   useEffect(() => {
     if (!soundOn) return;
@@ -36,6 +41,24 @@ export function Reveal() {
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col items-center px-6 py-10">
+      <div className="flex w-full items-center justify-between">
+        <button
+          onClick={resetGame}
+          className="rounded-full border p-1.5 text-muted-foreground hover:text-foreground hover:bg-card"
+          title="Leave game"
+        >
+          <LogOut className="h-4 w-4" />
+        </button>
+        {user && hostUserId && user.id === hostUserId && (
+          <button
+            onClick={hostEndGame}
+            className="rounded-full border p-1.5 text-muted-foreground hover:text-destructive hover:border-destructive"
+            title="End game"
+          >
+            <XCircle className="h-4 w-4" />
+          </button>
+        )}
+      </div>
       <div className="text-xs uppercase tracking-[0.4em] text-primary">The answer is</div>
       <motion.div
         initial={{ rotateX: 90, opacity: 0, scale: 0.9 }}
@@ -91,12 +114,16 @@ export function Reveal() {
         })}
       </div>
 
-      <button
-        onClick={handleContinue}
-        className="mt-10 inline-flex items-center gap-2 rounded-full bg-primary-gradient px-8 py-4 font-display font-bold uppercase tracking-widest text-primary-foreground shadow-lock"
-      >
-        Standings <ArrowRight className="h-4 w-4" />
-      </button>
+      {user && hostUserId && user.id === hostUserId ? (
+        <button
+          onClick={handleContinue}
+          className="mt-10 inline-flex items-center gap-2 rounded-full bg-primary-gradient px-8 py-4 font-display font-bold uppercase tracking-widest text-primary-foreground shadow-lock"
+        >
+          Standings <ArrowRight className="h-4 w-4" />
+        </button>
+      ) : (
+        <p className="mt-10 text-sm text-muted-foreground">Waiting for host to continue…</p>
+      )}
     </div>
   );
 }

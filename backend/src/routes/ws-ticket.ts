@@ -14,8 +14,6 @@ wsTicketRoute.get('/:id/ws', async (c) => {
     return c.json({ error: 'Invalid or expired ticket', code: 'INVALID_TICKET' }, 401)
   }
 
-  await c.env.RELFI_WS_TICKETS.delete(`ticket:${ticket}`)
-
   const { room_id, user_id } = JSON.parse(data)
 
   const doId = c.env.ROOM_STATE.idFromName(room_id)

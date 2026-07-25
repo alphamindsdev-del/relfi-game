@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Eye } from "lucide-react";
+import { Eye, LogOut, XCircle } from "lucide-react";
 import { StatementCard } from "../components/StatementCard";
 import { CategoryChip } from "../components/CategoryChip";
 import { CountdownRing } from "../components/CountdownRing";
@@ -8,6 +8,7 @@ import { SecretRoomModal } from "../components/SecretRoomModal";
 import { LockInButton } from "../components/LockInButton";
 import { AvatarStack } from "../components/Avatar";
 import { useGame, useYouRound } from "../state/store";
+import { useAuth } from "../state/auth-store";
 import { sfx } from "../audio/sound";
 import { parseClueVariant, apiCardToStatementCard } from "../lib/types";
 import type { StatementCard as StatementCardType } from "../lib/types";
@@ -25,6 +26,10 @@ export function Statement() {
   const setPick = useGame((s) => s.setPick);
   const lockIn = useGame((s) => s.lockIn);
   const youRole = useGame((s) => s.youRole);
+  const hostEndGame = useGame((s) => s.hostEndGame);
+  const resetGame = useGame((s) => s.resetGame);
+  const hostUserId = useGame((s) => s.hostUserId);
+  const user = useAuth((s) => s.user);
 
   const [secretOpen, setSecretOpen] = useState(false);
 
@@ -52,10 +57,30 @@ export function Statement() {
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col items-center px-6 py-8">
       <div className="flex w-full items-center justify-between">
-        <div className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
-          Round {roundIndex + 1}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={resetGame}
+            className="rounded-full border p-1.5 text-muted-foreground hover:text-foreground hover:bg-card"
+            title="Leave game"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
+          <div className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
+            Round {roundIndex + 1}
+          </div>
         </div>
-        <CountdownRing seconds={timerSeconds} size={72} />
+        <div className="flex items-center gap-2">
+          {user && hostUserId && user.id === hostUserId && (
+            <button
+              onClick={hostEndGame}
+              className="rounded-full border p-1.5 text-muted-foreground hover:text-destructive hover:border-destructive"
+              title="End game"
+            >
+              <XCircle className="h-4 w-4" />
+            </button>
+          )}
+          <CountdownRing seconds={timerSeconds} size={72} />
+        </div>
       </div>
 
       <div className="mt-8 w-full">

@@ -24,12 +24,19 @@ export function RelFiGame({ mode = "standalone", containerMode = "fullscreen" }:
   const setPhase = useGame((s) => s.setPhase);
   const applyWsEvent = useGame((s) => s.applyWsEvent);
   const resetGame = useGame((s) => s.resetGame);
+  const tryReconnect = useGame((s) => s.tryReconnect);
   const loadSession = useAuth((s) => s.loadSession);
   const initialized = useAuth((s) => s.initialized);
 
   useEffect(() => {
     loadSession().catch(() => {})
   }, [loadSession])
+
+  useEffect(() => {
+    if (initialized && phase === 'landing') {
+      tryReconnect()
+    }
+  }, [initialized])
 
   useEffect(() => {
     const unsub = relfiSocket.onServerEvent((event) => {
