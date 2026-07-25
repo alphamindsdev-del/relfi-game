@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
-import { Play, LogIn, UserPlus, Mail, ArrowLeft, Loader2, Send } from "lucide-react";
+import { Play, LogIn, UserPlus, Mail, ArrowLeft, Loader2, Send, Settings } from "lucide-react";
 import { useGame } from "../state/store";
 import { useAuth } from "../state/auth-store";
 import { unlockAudio } from "../audio/sound";
@@ -17,11 +17,16 @@ export function Landing() {
   const logout = useAuth((s) => s.logout);
   const authLoading = useAuth((s) => s.loading);
 
-  const [mode, setMode] = useState<"idle" | "host" | "join" | "login" | "signup" | "magic-link">("idle");
+  const [mode, setMode] = useState<"idle" | "host" | "join" | "login" | "signup" | "magic-link" | "profile">("idle");
   const [code, setCode] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [profileName, setProfileName] = useState("");
+  const [profileAvatar, setProfileAvatar] = useState("");
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState("");
+  const [profileSuccess, setProfileSuccess] = useState("");
   const [authError, setAuthError] = useState("");
   const [decks, setDecks] = useState<ApiDeck[]>([]);
   const [selectedDeckId, setSelectedDeckId] = useState("");
@@ -136,10 +141,10 @@ export function Landing() {
         <div className="text-xs uppercase tracking-[0.4em] text-primary">Rel-Fi</div>
         <h1 className="mt-3 font-display text-6xl font-black leading-none md:text-8xl">
           Read the card.<br />
-          <span className="text-shimmer">Spot the Seer.</span>
+          <span className="text-shimmer">Map the fiction.</span>
         </h1>
         <p className="mx-auto mt-5 max-w-md text-sm text-muted-foreground md:text-base">
-          A live social deduction party game. Bluff, decode, and lock in — one statement at a time.
+          A live social deduction party game. Bluff, decode, and lock in one statement at a time.
         </p>
       </motion.div>
 
@@ -155,6 +160,7 @@ export function Landing() {
               <div className="mb-2 text-center text-xs text-muted-foreground">
                 Logged in as <span className="text-foreground">{user.display_name}</span>
                 <button onClick={logout} className="ml-2 underline hover:text-primary">sign out</button>
+                <button onClick={() => { setProfileName(user.display_name); setProfileAvatar(user.avatar_url || ''); setProfileError(""); setProfileSuccess(""); setMode("profile") }} className="ml-2 underline hover:text-primary">edit profile</button>
               </div>
             )}
             <button
@@ -336,10 +342,43 @@ export function Landing() {
             <button type="button" onClick={() => setMode("idle")} className="text-xs text-muted-foreground hover:text-foreground">← back</button>
           </form>
         )}
+
+        {mode === "profile" && user && (
+          <form onSubmit={async (e) => { e.preventDefault(); setProfileError(""); setProfileSuccess(""); setProfileLoading(true); try { await api.updateMe({ display_name: profileName, avatar_url: profileAvatar || undefined }); setProfileSuccess("Profile updated!"); } catch (err: any) { setProfileError(err.message || "Failed to update profile"); } setProfileLoading(false); }} className="flex flex-col gap-3">
+            <h3 className="text-center font-display text-lg font-bold">Edit Profile</h3>
+            <label className="text-xs uppercase tracking-widest text-muted-foreground">Display name</label>
+            <input
+              type="text" value={profileName}
+              onChange={(e) => setProfileName(e.target.value)}
+              className="rounded-xl border bg-background/50 px-4 py-3 outline-none focus:border-primary"
+              required minLength={1} maxLength={50}
+            />
+            <label className="text-xs uppercase tracking-widest text-muted-foreground">Avatar URL (optional)</label>
+            <input
+              type="url" value={profileAvatar} placeholder="https://example.com/avatar.jpg"
+              onChange={(e) => setProfileAvatar(e.target.value)}
+              className="rounded-xl border bg-background/50 px-4 py-3 outline-none focus:border-primary"
+            />
+            {profileError && <p className="text-xs text-destructive">{profileError}</p>}
+            {profileSuccess && <p className="text-xs text-primary">{profileSuccess}</p>}
+            <button
+              type="submit" disabled={profileLoading}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary-gradient px-6 py-4 font-display text-base font-bold text-primary-foreground"
+            >
+              {profileLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Settings className="h-4 w-4" />}
+              Save Changes
+            </button>
+            <button type="button" onClick={() => setMode("idle")} className="text-xs text-muted-foreground hover:text-foreground">← back</button>
+          </form>
+        )}
       </motion.div>
 
       <div className="mt-10 flex items-center gap-6 text-xs text-muted-foreground">
-        <a href="/admin" className="hover:text-foreground">Admin</a>
+        {user?.role === 'admin' ? (
+          <a href="/admin" className="hover:text-foreground">Admin</a>
+        ) : (
+          <span>Player</span>
+        )}
         <span>·</span>
         <span>v0.1 prototype</span>
       </div>

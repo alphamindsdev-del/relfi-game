@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { Leaderboard } from "../components/Leaderboard";
 import { useGame } from "../state/store";
 import { useAuth } from "../state/auth-store";
 import { ArrowRight, LogOut, XCircle } from "lucide-react";
+import { ConfirmModal } from "../components/ConfirmModal";
 
 export function LeaderboardScreen() {
   const players = useGame((s) => s.players);
@@ -12,6 +14,8 @@ export function LeaderboardScreen() {
   const resetGame = useGame((s) => s.resetGame);
   const hostUserId = useGame((s) => s.hostUserId);
   const user = useAuth((s) => s.user);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  const [confirmEnd, setConfirmEnd] = useState(false);
 
   const handleNextRound = () => {
     hostAdvanceRound()
@@ -21,7 +25,7 @@ export function LeaderboardScreen() {
     <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col items-center px-6 py-12">
       <div className="flex w-full items-center justify-between">
         <button
-          onClick={resetGame}
+          onClick={() => setConfirmLeave(true)}
           className="rounded-full border p-1.5 text-muted-foreground hover:text-foreground hover:bg-card"
           title="Leave game"
         >
@@ -29,7 +33,7 @@ export function LeaderboardScreen() {
         </button>
         {user && hostUserId && user.id === hostUserId && (
           <button
-            onClick={hostEndGame}
+            onClick={() => setConfirmEnd(true)}
             className="rounded-full border p-1.5 text-muted-foreground hover:text-destructive hover:border-destructive"
             title="End game"
           >
@@ -57,6 +61,22 @@ export function LeaderboardScreen() {
       ) : (
         <p className="mt-12 text-sm text-muted-foreground">Waiting for host to continue…</p>
       )}
+
+      <ConfirmModal
+        open={confirmLeave}
+        title="Leave game?"
+        message="You will be disconnected and return to the home screen."
+        onConfirm={() => { setConfirmLeave(false); resetGame() }}
+        onCancel={() => setConfirmLeave(false)}
+      />
+      <ConfirmModal
+        open={confirmEnd}
+        title="End game now?"
+        message="The game will end immediately and final standings will be shown."
+        confirmLabel="End Game"
+        onConfirm={() => { setConfirmEnd(false); hostEndGame() }}
+        onCancel={() => setConfirmEnd(false)}
+      />
     </div>
   );
 }

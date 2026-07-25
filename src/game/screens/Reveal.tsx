@@ -1,9 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Check, X, ArrowRight, LogOut, XCircle } from "lucide-react";
 import { CategoryChip } from "../components/CategoryChip";
 import { Avatar } from "../components/Avatar";
 import { TokenCounter } from "../components/TokenCounter";
+import { ConfirmModal } from "../components/ConfirmModal";
 import { useGame } from "../state/store";
 import { useAuth } from "../state/auth-store";
 import { sfx } from "../audio/sound";
@@ -20,6 +21,8 @@ export function Reveal() {
   const revealData = useGame((s) => s.revealData);
   const frictionExplanation = useGame((s) => s.frictionExplanation);
   const user = useAuth((s) => s.user);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  const [confirmEnd, setConfirmEnd] = useState(false);
 
   useEffect(() => {
     if (!soundOn) return;
@@ -43,7 +46,7 @@ export function Reveal() {
     <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col items-center px-6 py-10">
       <div className="flex w-full items-center justify-between">
         <button
-          onClick={resetGame}
+          onClick={() => setConfirmLeave(true)}
           className="rounded-full border p-1.5 text-muted-foreground hover:text-foreground hover:bg-card"
           title="Leave game"
         >
@@ -51,7 +54,7 @@ export function Reveal() {
         </button>
         {user && hostUserId && user.id === hostUserId && (
           <button
-            onClick={hostEndGame}
+            onClick={() => setConfirmEnd(true)}
             className="rounded-full border p-1.5 text-muted-foreground hover:text-destructive hover:border-destructive"
             title="End game"
           >
@@ -124,6 +127,22 @@ export function Reveal() {
       ) : (
         <p className="mt-10 text-sm text-muted-foreground">Waiting for host to continue…</p>
       )}
+
+      <ConfirmModal
+        open={confirmLeave}
+        title="Leave game?"
+        message="You will be disconnected from this round."
+        onConfirm={() => { setConfirmLeave(false); resetGame() }}
+        onCancel={() => setConfirmLeave(false)}
+      />
+      <ConfirmModal
+        open={confirmEnd}
+        title="End game now?"
+        message="The game will end immediately and final standings will be shown."
+        confirmLabel="End Game"
+        onConfirm={() => { setConfirmEnd(false); hostEndGame() }}
+        onCancel={() => setConfirmEnd(false)}
+      />
     </div>
   );
 }

@@ -1,9 +1,11 @@
 import { motion } from "framer-motion";
 import { Play, Users, LogOut } from "lucide-react";
+import { useState } from "react";
 import { useGame } from "../state/store";
 import { useAuth } from "../state/auth-store";
 import { RoomCodeDisplay } from "../components/RoomCodeDisplay";
 import { Avatar } from "../components/Avatar";
+import { ConfirmModal } from "../components/ConfirmModal";
 
 export function Lobby() {
   const roomCode = useGame((s) => s.roomCode);
@@ -16,6 +18,7 @@ export function Lobby() {
   const canStart = players.length >= 2 && connected;
 
   const resetGame = useGame((s) => s.resetGame);
+  const [confirmLeave, setConfirmLeave] = useState(false);
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-6 py-12">
@@ -26,7 +29,7 @@ export function Lobby() {
         </div>
         <div className="flex items-center gap-4">
           <button
-            onClick={resetGame}
+            onClick={() => setConfirmLeave(true)}
             className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-card"
           >
             <LogOut className="h-3.5 w-3.5" /> Leave
@@ -38,6 +41,14 @@ export function Lobby() {
           </div>
         </div>
       </div>
+
+      <ConfirmModal
+        open={confirmLeave}
+        title="Leave game?"
+        message="You will be disconnected from this room."
+        onConfirm={() => { setConfirmLeave(false); resetGame() }}
+        onCancel={() => setConfirmLeave(false)}
+      />
 
       <div className="mt-8">
         <RoomCodeDisplay code={roomCode} />

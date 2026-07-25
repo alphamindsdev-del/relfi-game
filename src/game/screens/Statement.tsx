@@ -7,6 +7,7 @@ import { CountdownRing } from "../components/CountdownRing";
 import { SecretRoomModal } from "../components/SecretRoomModal";
 import { LockInButton } from "../components/LockInButton";
 import { AvatarStack } from "../components/Avatar";
+import { ConfirmModal } from "../components/ConfirmModal";
 import { useGame, useYouRound } from "../state/store";
 import { useAuth } from "../state/auth-store";
 import { sfx } from "../audio/sound";
@@ -30,6 +31,8 @@ export function Statement() {
   const resetGame = useGame((s) => s.resetGame);
   const hostUserId = useGame((s) => s.hostUserId);
   const user = useAuth((s) => s.user);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  const [confirmEnd, setConfirmEnd] = useState(false);
 
   const [secretOpen, setSecretOpen] = useState(false);
 
@@ -59,7 +62,7 @@ export function Statement() {
       <div className="flex w-full items-center justify-between">
         <div className="flex items-center gap-2">
           <button
-            onClick={resetGame}
+            onClick={() => setConfirmLeave(true)}
             className="rounded-full border p-1.5 text-muted-foreground hover:text-foreground hover:bg-card"
             title="Leave game"
           >
@@ -72,7 +75,7 @@ export function Statement() {
         <div className="flex items-center gap-2">
           {user && hostUserId && user.id === hostUserId && (
             <button
-              onClick={hostEndGame}
+              onClick={() => setConfirmEnd(true)}
               className="rounded-full border p-1.5 text-muted-foreground hover:text-destructive hover:border-destructive"
               title="End game"
             >
@@ -143,6 +146,22 @@ export function Statement() {
         onClose={() => setSecretOpen(false)}
         clue={clueVariant}
         categories={categories}
+      />
+
+      <ConfirmModal
+        open={confirmLeave}
+        title="Leave game?"
+        message="You will be disconnected from this round."
+        onConfirm={() => { setConfirmLeave(false); resetGame() }}
+        onCancel={() => setConfirmLeave(false)}
+      />
+      <ConfirmModal
+        open={confirmEnd}
+        title="End game now?"
+        message="The game will end immediately and final standings will be shown."
+        confirmLabel="End Game"
+        onConfirm={() => { setConfirmEnd(false); hostEndGame() }}
+        onCancel={() => setConfirmEnd(false)}
       />
     </div>
   );
