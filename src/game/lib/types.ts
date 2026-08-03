@@ -32,12 +32,23 @@ export type ApiStatementCard = {
   id: string
   deck_id: string
   statement_text: string
+  statement_image_url?: string
   correct_category_id: string
   friction_explanation?: string
-  clue_variant: 'none' | 'narrowed_list' | 'partial_text' | 'exact_answer'
+  clue_variant: 'none' | 'narrowed_list' | 'partial_text' | 'exact_answer' | 'image_clue'
   clue_payload?: string
+  clue_type: 'none' | 'text' | 'image'
+  clue_content?: string
   difficulty: 'easy' | 'medium' | 'hard'
   sort_order: number
+  created_at: number
+}
+
+export type ApiPendingCard = {
+  id: string
+  deck_id: string
+  statement_image_url: string
+  filename?: string
   created_at: number
 }
 
@@ -127,21 +138,30 @@ export type WsServerEvent =
   | { type: 'player:connection'; userId: string; status: 'connected' | 'reconnecting' }
   | { type: 'player:ready_state'; userId: string; ready: boolean }
   | { type: 'round:role_assigned'; role: Role }
-  | { type: 'round:started'; roundNumber: number; statementText: string; categoryOptions: ApiCategory[]; timerSeconds: number }
-  | { type: 'seer:clue'; clueVariant: string; cluePayload?: string }
+  | { type: 'round:started'; roundNumber: number; statementText: string; statementImageUrl?: string; categoryOptions: ApiCategory[]; timerSeconds: number; timerEnd?: number; roles?: Record<string, Role> }
+  | { type: 'seer:clue'; clueVariant: string; cluePayload?: string; clueType?: string; clueContent?: string }
   | { type: 'round:turn'; speakingUserId: string }
   | { type: 'round:timer_tick'; secondsRemaining: number }
   | { type: 'player:locked'; userId: string }
+  | { type: 'seer:pick_revealed'; userId: string; pick: string }
   | { type: 'round:reveal'; correctCategoryId: string; perPlayerAnswers: RoundPlayerAnswer[]; frictionExplanation?: string; tokensAwarded: Record<string, number> }
   | { type: 'leaderboard:update'; standings: LeaderboardEntry[] }
   | { type: 'game:ended'; finalStandings: LeaderboardEntry[] }
+  | { type: 'lobby:countdown'; seconds: number }
+  | { type: 'host:changed'; hostUserId: string }
+  | { type: 'phase:changed'; phase: string; timerEnd?: number }
   | { type: 'error'; code: string; message: string }
 
 export type WsClientEvent =
   | { type: 'player:ready' }
   | { type: 'host:start_game' }
-  | { type: 'host:next_speaker'; userId: string }
+  | { type: 'host:set_timer'; seconds: number }
+  | { type: 'host:start_persuasion' }
+  | { type: 'host:start_lockin' }
+  | { type: 'host:next_speaker' }
   | { type: 'host:advance_round' }
+  | { type: 'host:force_reveal' }
+  | { type: 'host:end_game' }
   | { type: 'skeptic:decision'; decision: 'follow' | 'bluff' | 'solo'; trusted_seer_id?: string }
   | { type: 'player:lock_answer'; category_id: string }
 
@@ -172,6 +192,8 @@ export type WsPlayer = {
   role?: Role
   locked: boolean
   pick?: string
+  decision?: 'follow' | 'bluff' | 'solo'
+  trustedSeerId?: string
   tokens: number
 }
 
@@ -183,6 +205,7 @@ export type Category = {
   color: string
   icon: string
   definition: string
+  shortCode?: string
 }
 
 export type StatementCard = {
@@ -199,6 +222,7 @@ export type ClueVariant =
   | { kind: 'narrowed'; categoryIds: string[] }
   | { kind: 'partial'; text: string }
   | { kind: 'exact'; categoryId: string }
+  | { kind: 'image'; url: string }
 
 export type Player = {
   id: string
@@ -215,6 +239,8 @@ export type PlayerRound = {
   pick?: string
   locked: boolean
   awarded: number
+  decision?: 'follow' | 'bluff' | 'solo'
+  trustedSeerId?: string
 }
 
 // ===== Converters =====
@@ -226,6 +252,7 @@ export function apiCategoryToCategory(api: ApiCategory): Category {
     color: api.color_hex,
     icon: iconKeyToLucide(api.icon_key || 'circle'),
     definition: api.definition || '',
+    shortCode: api.short_code,
   }
 }
 
@@ -240,7 +267,13 @@ export function apiCardToStatementCard(api: ApiStatementCard): StatementCard {
   }
 }
 
-export function parseClueVariant(variant: string, payload?: string): ClueVariant {
+export function parseClueVariant(variant: string, payload?: string, clueType?: string, clueContent?: string): ClueVariant {
+  if (clueType === 'image' || variant === 'image_clue') {
+    return { kind: 'image', url: clueContent || payload || '' }
+  }
+  if (clueType === 'text') {
+    return { kind: 'partial', text: clueContent || (payload ? JSON.parse(payload).text || '' : '') }
+  }
   switch (variant) {
     case 'narrowed_list':
       return { kind: 'narrowed', categoryIds: payload ? JSON.parse(payload).narrowed_ids || [] : [] }

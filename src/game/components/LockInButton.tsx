@@ -33,7 +33,7 @@ export function LockInButton({
       )}
     >
       {locked ? <Check className="h-5 w-5" /> : <Lock className="h-5 w-5" />}
-      {locked ? "Locked in" : "Lock it in"}
+      {locked ? "Mapped" : "Map it"}
       {!locked && !disabled && (
         <span className="pointer-events-none absolute inset-0 rounded-full opacity-0 transition-opacity group-hover:opacity-100" style={{ boxShadow: "0 0 40px var(--primary)" }} />
       )}

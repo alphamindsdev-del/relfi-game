@@ -9,6 +9,7 @@ import { cardsRoutes } from './routes/cards'
 import { roomsRoutes } from './routes/rooms'
 import { usersRoutes } from './routes/users'
 import { wsTicketRoute } from './routes/ws-ticket'
+import { uploadRoutes } from './routes/upload'
 import type { JwtPayload } from './lib/jwt'
 
 export type Env = {
@@ -68,6 +69,7 @@ app.route('/api/decks', cardsRoutes)
 app.route('/api/rooms', roomsRoutes)
 app.route('/api/rooms', wsTicketRoute)
 app.route('/api/users', usersRoutes)
+app.route('/api', uploadRoutes)
 
 export default app
 

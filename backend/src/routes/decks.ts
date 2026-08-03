@@ -13,7 +13,7 @@ decksRoutes.get('/', async (c) => {
   const published = c.req.query('published')
   let query = `
     SELECT d.*, 
-      (SELECT COUNT(*) FROM statement_cards WHERE deck_id = d.id) as card_count,
+      (SELECT COUNT(*) FROM statement_cards WHERE deck_id = d.id AND is_active = 1) as card_count,
       (SELECT COUNT(*) FROM deck_categories WHERE deck_id = d.id) as category_count
     FROM decks d
   `
@@ -37,11 +37,11 @@ decksRoutes.get('/:id', async (c) => {
   const { results: categories } = await c.env.DB.prepare(
     `SELECT c.* FROM categories c
      JOIN deck_categories dc ON c.id = dc.category_id
-     WHERE dc.deck_id = ?`
+     WHERE dc.deck_id = ? AND c.is_active = 1`
   ).bind(id).all()
 
   const { results: cards } = await c.env.DB.prepare(
-    'SELECT * FROM statement_cards WHERE deck_id = ? ORDER BY sort_order ASC'
+    'SELECT * FROM statement_cards WHERE deck_id = ? AND is_active = 1 ORDER BY sort_order ASC'
   ).bind(id).all()
 
   return c.json({ ...deck, categories, cards })

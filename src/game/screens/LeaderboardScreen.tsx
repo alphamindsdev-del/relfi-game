@@ -13,16 +13,20 @@ export function LeaderboardScreen() {
   const hostEndGame = useGame((s) => s.hostEndGame);
   const resetGame = useGame((s) => s.resetGame);
   const hostUserId = useGame((s) => s.hostUserId);
+  const mode = useGame((s) => s.mode);
+  const revealData = useGame((s) => s.revealData);
   const user = useAuth((s) => s.user);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
+
+  const youGotItRight = !!revealData?.perPlayerAnswers?.find((a: any) => a.userId === youId)?.isCorrect;
 
   const handleNextRound = () => {
     hostAdvanceRound()
   }
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col items-center px-6 py-12">
+    <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col items-center px-6 pt-16 pb-12">
       <div className="flex w-full items-center justify-between">
         <button
           onClick={() => setConfirmLeave(true)}
@@ -45,8 +49,14 @@ export function LeaderboardScreen() {
       <h1 className="mt-2 font-display text-4xl font-bold md:text-5xl">Standings</h1>
 
       <div className="mt-10 w-full max-w-lg">
-        {players.length > 0 && players.every((p) => p.tokens === 0) && (
-          <p className="mb-4 text-center text-sm text-muted-foreground">No one got it right — no winners this round.</p>
+        {mode === 'solo' ? (
+          !youGotItRight && (
+            <p className="mb-4 text-center text-sm text-muted-foreground">You didn't get it right this round.</p>
+          )
+        ) : (
+          players.length > 0 && players.every((p) => p.tokens === 0) && (
+            <p className="mb-4 text-center text-sm text-muted-foreground">No one got it right. No winners this round.</p>
+          )
         )}
         <Leaderboard players={players} youId={youId} />
       </div>
@@ -59,7 +69,7 @@ export function LeaderboardScreen() {
           Next round <ArrowRight className="h-4 w-4" />
         </button>
       ) : (
-        <p className="mt-12 text-sm text-muted-foreground">Waiting for host to continue…</p>
+        <p className="mt-12 text-sm text-muted-foreground">Next round starting…</p>
       )}
 
       <ConfirmModal

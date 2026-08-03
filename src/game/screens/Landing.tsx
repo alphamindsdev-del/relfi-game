@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { Play, LogIn, UserPlus, Mail, ArrowLeft, Loader2, Send, Settings } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { useGame } from "../state/store";
 import { useAuth } from "../state/auth-store";
 import { unlockAudio } from "../audio/sound";
@@ -29,8 +30,10 @@ export function Landing() {
   const [profileSuccess, setProfileSuccess] = useState("");
   const [authError, setAuthError] = useState("");
   const [decks, setDecks] = useState<ApiDeck[]>([]);
+  const [deckError, setDeckError] = useState("");
   const [selectedDeckId, setSelectedDeckId] = useState("");
   const [selectedMode, setSelectedMode] = useState<"seer_skeptic" | "multiplayer_seer" | "solo">("seer_skeptic");
+  const [timerSeconds, setTimerSeconds] = useState(45);
   const [loading, setLoading] = useState(false);
   const [joinError, setJoinError] = useState("");
   const [pendingJoinCode, setPendingJoinCode] = useState("");
@@ -38,7 +41,7 @@ export function Landing() {
 
   useEffect(() => {
     if (mode === "host" && user) {
-      api.getDecks(true).then(setDecks).catch(() => {})
+      api.getDecks(true).then(setDecks).catch(() => setDeckError('Failed to load decks. Check your connection.'))
     }
   }, [mode, user])
 
@@ -75,6 +78,10 @@ export function Landing() {
     }
     setLoading(false)
   }
+
+  useEffect(() => {
+    useGame.setState({ timerSeconds })
+  }, [timerSeconds])
 
   async function handleJoin(e: React.FormEvent) {
     e.preventDefault()
@@ -192,6 +199,13 @@ export function Landing() {
                 Sign in / Create account
               </button>
             )}
+            <Link
+              to="/tutorial"
+              className="mt-2 inline-flex items-center justify-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors"
+            >
+              <Play className="h-3 w-3" />
+              How to play: watch the tutorial
+            </Link>
           </div>
         )}
 
@@ -218,18 +232,39 @@ export function Landing() {
             )}
 
             {selectedDeckId && (
-              <div className="flex flex-col gap-2">
-                <label className="text-xs uppercase tracking-widest text-muted-foreground">Game Mode</label>
-                <select
-                  value={selectedMode}
-                  onChange={(e) => setSelectedMode(e.target.value as any)}
-                  className="rounded-xl border bg-background/50 px-4 py-3"
-                >
-                  <option value="seer_skeptic">Seer & Skeptic (2 players)</option>
-                  <option value="multiplayer_seer">Multiplayer Seer (3-6 players)</option>
-                  <option value="solo">Solo Mode (1 player)</option>
-                </select>
-              </div>
+              <>
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs uppercase tracking-widest text-muted-foreground">Game Mode</label>
+                  <select
+                    value={selectedMode}
+                    onChange={(e) => setSelectedMode(e.target.value as any)}
+                    className="rounded-xl border bg-background/50 px-4 py-3"
+                  >
+                    <option value="seer_skeptic">Seer & Skeptic (2 players)</option>
+                    <option value="multiplayer_seer">Multiplayer Seer (3-6 players)</option>
+                    <option value="solo">Solo Mode (1 player)</option>
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs uppercase tracking-widest text-muted-foreground">
+                    Round Timer: {timerSeconds}s
+                  </label>
+                  <input
+                    type="range"
+                    min={15}
+                    max={120}
+                    step={5}
+                    value={timerSeconds}
+                    onChange={(e) => setTimerSeconds(Number(e.target.value))}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-[10px] text-muted-foreground">
+                    <span>15s</span>
+                    <span>120s</span>
+                  </div>
+                </div>
+              </>
             )}
 
             {authError && <p className="text-xs text-destructive">{authError}</p>}

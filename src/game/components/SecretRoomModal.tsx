@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { EyeOff, Lock } from "lucide-react";
+import { EyeOff, ImageIcon, Lock } from "lucide-react";
 import { CategoryChip } from "./CategoryChip";
 import type { Category, ClueVariant } from "../lib/types";
 
@@ -39,14 +39,14 @@ export function SecretRoomModal({
           >
             <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-primary">
               <Lock className="h-3.5 w-3.5" />
-              Secret Room — Seers only
+              Secret Room: Seers only
             </div>
             <h3 className="mt-3 font-display text-2xl font-bold">Your clue</h3>
 
             <div className="mt-6 space-y-4">
               {clue.kind === "none" && (
                 <p className="rounded-2xl border bg-muted/50 p-4 text-sm text-muted-foreground">
-                  No clue this round. You're operating on instinct — sell it anyway.
+                  No clue this round. You're operating on instinct. Sell it anyway.
                 </p>
               )}
               {clue.kind === "narrowed" && (
@@ -76,8 +76,27 @@ export function SecretRoomModal({
                     <CategoryChip category={categories.find((c) => c.id === clue.categoryId)!} selected size="lg" />
                   </div>
                   <p className="mt-3 text-xs text-muted-foreground">
-                    You know the truth. Don't be too obvious — you have to convince the Skeptic.
+                    You know the truth. Don't be too obvious. You have to convince the Skeptic.
                   </p>
+                </div>
+              )}
+              {clue.kind === "image" && (
+                <div>
+                  <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-widest text-muted-foreground">
+                    <ImageIcon className="h-3.5 w-3.5" />
+                    Visual clue
+                  </div>
+                  <div className="overflow-hidden rounded-2xl border border-primary/20 bg-card">
+                    <img
+                      src={clue.url}
+                      alt="Visual clue"
+                      className="h-auto w-full object-contain"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = ''
+                        ;(e.target as HTMLImageElement).classList.add('hidden')
+                      }}
+                    />
+                  </div>
                 </div>
               )}
             </div>

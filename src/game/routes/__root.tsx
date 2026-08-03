@@ -78,13 +78,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { name: "theme-color", content: "#0B0B0D" },
-      { title: "Rel-Fi — the social deduction party game" },
+      { title: "Rel-Fi: the social deduction party game" },
       {
         name: "description",
         content:
           "Rel-Fi is a live social deduction party game. Read the statement, spot the Seer, bluff the Skeptic, lock in your answer.",
       },
-      { property: "og:title", content: "Rel-Fi — social deduction, live" },
+      { property: "og:title", content: "Rel-Fi: social deduction, live" },
       {
         property: "og:description",
         content: "Read the card. Spot the Seer. Lock in. A premium live party game.",

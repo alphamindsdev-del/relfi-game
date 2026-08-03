@@ -4,24 +4,25 @@ import { useGame } from "../state/store";
 
 export function CountdownRing({
   seconds,
+  endsAt,
   onDone,
   size = 96,
 }: {
   seconds: number;
+  endsAt?: number;
   onDone?: () => void;
   size?: number;
 }) {
-  const [remaining, setRemaining] = useState(seconds);
+  const [remaining, setRemaining] = useState(endsAt ? Math.max(0, (endsAt - Date.now()) / 1000) : seconds);
   const soundOn = useGame((s) => s.soundOn);
   const doneRef = useRef(false);
 
   useEffect(() => {
     doneRef.current = false;
-    setRemaining(seconds);
-    const start = Date.now();
+    const compute = () => (endsAt ? Math.max(0, (endsAt - Date.now()) / 1000) : seconds);
+    setRemaining(compute());
     const iv = window.setInterval(() => {
-      const elapsed = (Date.now() - start) / 1000;
-      const r = Math.max(0, seconds - elapsed);
+      const r = compute();
       setRemaining(r);
       if (soundOn && r > 0 && r <= 5 && Math.floor(r * 10) % 10 === 0) sfx.tick();
       if (r <= 0 && !doneRef.current) {
@@ -31,9 +32,9 @@ export function CountdownRing({
       }
     }, 100);
     return () => window.clearInterval(iv);
-  }, [seconds, onDone, soundOn]);
+  }, [seconds, endsAt, onDone, soundOn]);
 
-  const pct = remaining / seconds;
+  const pct = seconds > 0 ? remaining / seconds : 0;
   const stroke = 6;
   const r = size / 2 - stroke;
   const circumference = 2 * Math.PI * r;

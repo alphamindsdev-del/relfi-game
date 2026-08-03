@@ -10,7 +10,8 @@ export type ClueVariant =
   | { kind: "none" }
   | { kind: "narrowed"; categoryIds: string[] }
   | { kind: "partial"; text: string }
-  | { kind: "exact"; categoryId: string };
+  | { kind: "exact"; categoryId: string }
+  | { kind: "image"; url: string };
 
 export type StatementCard = {
   id: string;
@@ -54,7 +55,7 @@ export const MOCK_DECK: Deck = {
   cards: [
     {
       id: "c1",
-      text: "Humans only use 10% of their brain — the other 90% is untapped potential.",
+      text: "Humans only use 10% of their brain. The other 90% is untapped potential.",
       correctCategoryId: "myth",
       clue: { kind: "narrowed", categoryIds: ["myth", "opinion"] },
       friction:
@@ -62,7 +63,7 @@ export const MOCK_DECK: Deck = {
     },
     {
       id: "c2",
-      text: "A well-known tech CEO once claimed self-driving cars would be fully autonomous 'by next year' — every year for eight years running.",
+      text: "A well-known tech CEO once claimed self-driving cars would be fully autonomous 'by next year', every year for eight years running.",
       correctCategoryId: "spin",
       clue: { kind: "partial", text: "The statement is technically citing real quotes, but arranged to mislead about the underlying trajectory." },
     },
@@ -75,7 +76,7 @@ export const MOCK_DECK: Deck = {
     },
     {
       id: "c4",
-      text: "The player wearing #23 will drop 40 tonight — book it.",
+      text: "The player wearing #23 will drop 40 tonight. Book it.",
       correctCategoryId: "opinion",
       clue: { kind: "narrowed", categoryIds: ["opinion", "rumor"] },
     },
@@ -87,7 +88,7 @@ export const MOCK_DECK: Deck = {
     },
     {
       id: "c6",
-      text: "A source close to the situation says the deal is done — announcement Monday.",
+      text: "A source close to the situation says the deal is done. Announcement Monday.",
       correctCategoryId: "rumor",
       clue: { kind: "partial", text: "Trace it back and you'll find the primary source is a single anonymous tweet." },
     },

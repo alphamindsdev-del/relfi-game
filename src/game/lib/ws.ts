@@ -8,16 +8,23 @@ export class RelFiSocket {
   private ws: WebSocket | null = null
   private handlers: Set<EventHandler> = new Set()
   private roomId: string = ''
+  private roomCode: string = ''
   private ticket: string = ''
   private reconnectAttempts = 0
   private maxReconnectAttempts = 10
   private reconnectTimeout: ReturnType<typeof setTimeout> | null = null
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null
   private intentionalClose = false
+  private onReconnectHandler: ((roomCode: string) => Promise<string>) | null = null
 
-  connect(roomId: string, ticket: string) {
+  setReconnectHandler(handler: (roomCode: string) => Promise<string>) {
+    this.onReconnectHandler = handler
+  }
+
+  connect(roomId: string, ticket: string, roomCode?: string) {
     this.roomId = roomId
     this.ticket = ticket
+    this.roomCode = roomCode || ''
     this.intentionalClose = false
     this.reconnectAttempts = 0
     this.open()
@@ -41,7 +48,6 @@ export class RelFiSocket {
         this.handlers.forEach((handler) => handler(event))
 
         if (event.type === 'room:state') {
-          // Store updated room info for reconnection
           if (event.state.roomId) {
             this.roomId = event.state.roomId
           }
@@ -55,16 +61,32 @@ export class RelFiSocket {
       this.stopHeartbeat()
       if (!this.intentionalClose && this.reconnectAttempts < this.maxReconnectAttempts) {
         const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000)
-        this.reconnectTimeout = setTimeout(() => {
-          this.reconnectAttempts++
-          this.open()
-        }, delay)
+        this.reconnectTimeout = setTimeout(() => this.attemptReconnect(), delay)
       }
     }
 
     this.ws.onerror = () => {
       // onclose will fire after this
     }
+  }
+
+  private async attemptReconnect() {
+    if (this.intentionalClose) return
+    if (this.onReconnectHandler && this.roomCode) {
+      try {
+        const newTicket = await this.onReconnectHandler(this.roomCode)
+        this.ticket = newTicket
+      } catch {
+        this.reconnectAttempts++
+        if (this.reconnectAttempts < this.maxReconnectAttempts) {
+          const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000)
+          this.reconnectTimeout = setTimeout(() => this.attemptReconnect(), delay)
+        }
+        return
+      }
+    }
+    this.reconnectAttempts++
+    this.open()
   }
 
   disconnect() {

@@ -3,6 +3,7 @@ import type {
   ApiDeck,
   ApiDeckDetail,
   ApiStatementCard,
+  ApiPendingCard,
   ApiUser,
   ApiRoom,
   ApiRoomHistory,
@@ -164,11 +165,14 @@ export async function publishDeck(id: string): Promise<void> {
 // ===== Statement Cards =====
 
 export async function createCard(deckId: string, data: {
-  statement_text: string
+  statement_text?: string
+  statement_image_url?: string
   correct_category_id: string
   friction_explanation?: string
   clue_variant?: string
   clue_payload?: string
+  clue_type?: string
+  clue_content?: string
   difficulty?: string
 }): Promise<ApiStatementCard> {
   return request(`/decks/${deckId}/cards`, {
@@ -184,8 +188,101 @@ export async function updateCard(deckId: string, cardId: string, data: Partial<A
   })
 }
 
+export async function uploadClueImage(file: File): Promise<{ url: string; key: string }> {
+  const formData = new FormData()
+  formData.append('file', file)
+  const token = getToken()
+  const res = await fetch(`${API_BASE}/upload/clue-image`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: 'Upload failed' }))
+    throw new ApiError(res.status, 'UPLOAD_FAILED', body.error || 'Upload failed')
+  }
+  return res.json()
+}
+
+export async function uploadTutorial(file: File): Promise<{ url: string; uploadedAt: number }> {
+  const formData = new FormData()
+  formData.append('file', file)
+  const token = getToken()
+  const res = await fetch(`${API_BASE}/upload/tutorial`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: 'Upload failed' }))
+    throw new ApiError(res.status, 'UPLOAD_FAILED', body.error || 'Upload failed')
+  }
+  return res.json()
+}
+
+export async function getTutorialInfo(): Promise<{ exists: boolean; url?: string; filename?: string; uploadedAt?: number }> {
+  const res = await fetch(`${API_BASE}/tutorial/info`)
+  if (!res.ok) return { exists: false }
+  const data = await res.json()
+  if (data.exists) {
+    data.url = `${API_BASE}/tutorial/video`
+  }
+  return data
+}
+
+export const TUTORIAL_VIDEO_URL = `${API_BASE.replace('/api', '')}/api/tutorial/video`
+
 export async function deleteCard(deckId: string, cardId: string): Promise<void> {
   await request(`/decks/${deckId}/cards/${cardId}`, { method: 'DELETE' })
+}
+
+// ===== Statement image uploads & pending cards =====
+
+export async function uploadStatementImage(file: File): Promise<{ url: string; key: string }> {
+  const formData = new FormData()
+  formData.append('file', file)
+  const token = getToken()
+  const res = await fetch(`${API_BASE}/upload/statement-image`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: 'Upload failed' }))
+    throw new ApiError(res.status, 'UPLOAD_FAILED', body.error || 'Upload failed')
+  }
+  return res.json()
+}
+
+export async function uploadBulkStatementImages(deckId: string, files: File[]): Promise<{ success: boolean; imported: number; cards: ApiPendingCard[] }> {
+  const formData = new FormData()
+  files.forEach((f) => formData.append('files', f))
+  const token = getToken()
+  const res = await fetch(`${API_BASE}/decks/${deckId}/cards/bulk-images`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: 'Upload failed' }))
+    throw new ApiError(res.status, 'IMPORT_FAILED', body.error || 'Upload failed')
+  }
+  return res.json()
+}
+
+export async function getPendingCards(deckId: string): Promise<ApiPendingCard[]> {
+  return request(`/decks/${deckId}/cards/pending`)
+}
+
+export async function convertPendingCard(deckId: string, pendingId: string, data: Partial<ApiStatementCard>): Promise<ApiStatementCard> {
+  return request(`/decks/${deckId}/cards/pending/${pendingId}/convert`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function deletePendingCard(deckId: string, pendingId: string): Promise<void> {
+  await request(`/decks/${deckId}/cards/pending/${pendingId}`, { method: 'DELETE' })
 }
 
 export async function bulkImportCards(deckId: string, file: File): Promise<{ success: boolean; imported: number }> {

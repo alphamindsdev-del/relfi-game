@@ -5,6 +5,7 @@ import { Landing } from "../screens/Landing";
 import { Lobby } from "../screens/Lobby";
 import { RoleReveal } from "../screens/RoleReveal";
 import { Statement } from "../screens/Statement";
+import { Persuasion } from "../screens/Persuasion";
 import { Reveal } from "../screens/Reveal";
 import { LeaderboardScreen } from "../screens/LeaderboardScreen";
 import { Final } from "../screens/Final";
@@ -60,7 +61,7 @@ export function RelFiGame({ mode = "standalone", containerMode = "fullscreen" }:
     >
       <div className="absolute inset-0 -z-10 bg-hero" />
 
-      <div className="fixed right-4 top-4 z-40 flex items-center gap-2">
+      <div className="fixed left-4 top-4 z-40 flex items-center gap-2">
         {user && (
           <Avatar
             name={user.display_name}
@@ -84,7 +85,7 @@ export function RelFiGame({ mode = "standalone", containerMode = "fullscreen" }:
           {phase === "lobby" && <Lobby />}
           {phase === "role-reveal" && <RoleReveal />}
           {phase === "statement" && <Statement />}
-          {phase === "persuasion" && <Statement />}
+          {phase === "persuasion" && <Persuasion />}
           {phase === "lockin" && <Statement />}
           {phase === "reveal" && <Reveal />}
           {phase === "leaderboard" && <LeaderboardScreen />}

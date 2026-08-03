@@ -30,11 +30,14 @@ export const deckSchema = z.object({
 })
 
 export const cardSchema = z.object({
-  statement_text: z.string().min(1).max(2000),
-  correct_category_id: z.string(),
+  statement_text: z.string().max(2000).optional(),
+  statement_image_url: z.string().max(500).optional(),
+  correct_category_id: z.string().min(1),
   friction_explanation: z.string().max(2000).optional(),
   clue_variant: z.enum(['none', 'narrowed_list', 'partial_text', 'exact_answer']).default('none'),
   clue_payload: z.string().optional(),
+  clue_type: z.enum(['none', 'text', 'image']).default('none'),
+  clue_content: z.string().optional(),
   difficulty: z.enum(['easy', 'medium', 'hard']).default('medium'),
 })
 

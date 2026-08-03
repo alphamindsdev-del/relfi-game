@@ -37,11 +37,8 @@ export function computeScores(params: {
   const trustedSeer = params.trustedSeerId
 
   if (decision === 'follow') {
-    if (isCorrect) {
-      // Seer persuaded correctly
-      for (const seerId of params.seerIds) {
-        tokens[seerId] = seerId === trustedSeer ? 2 : (params.mode === 'multiplayer_seer' ? 0 : 0)
-      }
+    const trustedCorrect = trustedSeer ? (params.isCorrect[trustedSeer] ?? false) : isCorrect
+    if (trustedCorrect) {
       // Only trusted seer gets tokens; if only one seer, that's the trusted one
       if (trustedSeer) tokens[trustedSeer] = 2
       else if (params.seerIds.length === 1) tokens[params.seerIds[0]] = 2

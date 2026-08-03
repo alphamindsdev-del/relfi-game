@@ -1,11 +1,11 @@
 import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { RoleRevealCard } from "../components/RoleRevealCard";
-import { useGame, useYouRound } from "../state/store";
+import { useGame } from "../state/store";
 import { sfx } from "../audio/sound";
 
 export function RoleReveal() {
-  const you = useYouRound();
+  const youRole = useGame((s) => s.youRole);
   const soundOn = useGame((s) => s.soundOn);
   const phase = useGame((s) => s.phase);
 
@@ -13,13 +13,11 @@ export function RoleReveal() {
     if (soundOn) sfx.roleReveal();
   }, [soundOn]);
 
-  // Wait for round:started server event to transition to statement phase
   if (phase !== 'role-reveal') return null;
-
-  if (!you) return null;
+  if (!youRole) return null;
   return (
     <div className="grid min-h-screen place-items-center px-6">
-      <RoleRevealCard role={you.role} />
+      <RoleRevealCard role={youRole} />
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}

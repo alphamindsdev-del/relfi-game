@@ -43,7 +43,7 @@ export function Reveal() {
   }
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col items-center px-6 py-10">
+    <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col items-center px-6 pt-16 pb-10">
       <div className="flex w-full items-center justify-between">
         <button
           onClick={() => setConfirmLeave(true)}
@@ -110,7 +110,7 @@ export function Reveal() {
                 )}
               </div>
               <div className="w-16 text-right">
-                {r?.awarded ? <TokenCounter value={r.awarded} size="sm" /> : <span className="text-xs text-muted-foreground">—</span>}
+                {r?.awarded ? <TokenCounter value={r.awarded} size="sm" /> : <span className="text-xs text-muted-foreground">0</span>}
               </div>
             </motion.div>
           );
@@ -125,7 +125,7 @@ export function Reveal() {
           Standings <ArrowRight className="h-4 w-4" />
         </button>
       ) : (
-        <p className="mt-10 text-sm text-muted-foreground">Waiting for host to continue…</p>
+        <p className="mt-10 text-sm text-muted-foreground">Next up: standings…</p>
       )}
 
       <ConfirmModal

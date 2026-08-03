@@ -11,6 +11,8 @@
 import { Route as rootRouteImport } from './__root'
 import { Route as IndexRouteImport } from './index'
 import { Route as AdminRouteImport } from './admin'
+import { Route as TutorialRouteImport } from './tutorial'
+import { Route as BroadcastCodeRouteImport } from './broadcast.$code'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -22,31 +24,49 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TutorialRoute = TutorialRouteImport.update({
+  id: '/tutorial',
+  path: '/tutorial',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BroadcastCodeRoute = BroadcastCodeRouteImport.update({
+  id: '/broadcast/$code',
+  path: '/broadcast/$code',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/tutorial': typeof TutorialRoute
+  '/broadcast/$code': typeof BroadcastCodeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/tutorial': typeof TutorialRoute
+  '/broadcast/$code': typeof BroadcastCodeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/tutorial': typeof TutorialRoute
+  '/broadcast/$code': typeof BroadcastCodeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/admin'
+  fullPaths: '/' | '/admin' | '/tutorial' | '/broadcast/$code'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin'
-  id: '__root__' | '/' | '/admin'
+  to: '/' | '/admin' | '/tutorial' | '/broadcast/$code'
+  id: '__root__' | '/' | '/admin' | '/tutorial' | '/broadcast/$code'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
+  TutorialRoute: typeof TutorialRoute
+  BroadcastCodeRoute: typeof BroadcastCodeRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -65,12 +85,28 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/tutorial': {
+      id: '/tutorial'
+      path: '/tutorial'
+      fullPath: '/tutorial'
+      preLoaderRoute: typeof TutorialRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/broadcast/$code': {
+      id: '/broadcast/$code'
+      path: '/broadcast/$code'
+      fullPath: '/broadcast/$code'
+      preLoaderRoute: typeof BroadcastCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
+  TutorialRoute: TutorialRoute,
+  BroadcastCodeRoute: BroadcastCodeRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

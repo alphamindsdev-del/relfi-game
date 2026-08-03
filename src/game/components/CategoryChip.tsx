@@ -47,7 +47,12 @@ export function CategoryChip({
       }}
     >
       <Icon className={size === "sm" ? "h-3.5 w-3.5" : size === "lg" ? "h-5 w-5" : "h-4 w-4"} />
-      {showLabel && <span>{category.name}</span>}
+      {showLabel && (
+        <span className="inline-flex items-baseline gap-1.5">
+          {category.shortCode && <span className="font-bold opacity-80">{category.shortCode}</span>}
+          <span>{category.name}</span>
+        </span>
+      )}
     </motion.button>
   );
 }

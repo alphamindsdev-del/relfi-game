@@ -21,3 +21,16 @@ wsTicketRoute.get('/:id/ws', async (c) => {
 
   return stub.fetch(c.req.raw)
 })
+
+wsTicketRoute.get('/:code/spectate', async (c) => {
+  const code = c.req.query('code') || c.req.param('code') || ''
+  const roomId = await c.env.RELFI_ROOM_CODES.get(`code:${code.toUpperCase()}`)
+  if (!roomId) {
+    return c.json({ error: 'Room not found', code: 'NOT_FOUND' }, 404)
+  }
+
+  const doId = c.env.ROOM_STATE.idFromName(roomId)
+  const stub = c.env.ROOM_STATE.get(doId)
+
+  return stub.fetch(c.req.raw)
+})

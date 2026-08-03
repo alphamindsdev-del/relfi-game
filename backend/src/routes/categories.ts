@@ -11,7 +11,7 @@ export const categoriesRoutes = new Hono<{ Bindings: Env }>()
 
 categoriesRoutes.get('/', async (c) => {
   const { results } = await c.env.DB.prepare(
-    'SELECT * FROM categories ORDER BY short_code ASC'
+    "SELECT * FROM categories WHERE is_active = 1 ORDER BY short_code ASC"
   ).all()
   return c.json(results)
 })
@@ -19,7 +19,7 @@ categoriesRoutes.get('/', async (c) => {
 categoriesRoutes.get('/:id', async (c) => {
   const id = c.req.param('id')
   const category = await c.env.DB.prepare(
-    'SELECT * FROM categories WHERE id = ?'
+    'SELECT * FROM categories WHERE id = ? AND is_active = 1'
   ).bind(id).first()
   if (!category) return c.json({ error: 'Not found', code: 'NOT_FOUND' }, 404)
   return c.json(category)
@@ -72,6 +72,6 @@ categoriesRoutes.delete('/:id', AuthMiddleware, AdminOnly, async (c) => {
   const existing = await c.env.DB.prepare('SELECT * FROM categories WHERE id = ?').bind(id).first()
   if (!existing) return c.json({ error: 'Not found', code: 'NOT_FOUND' }, 404)
 
-  await c.env.DB.prepare('DELETE FROM categories WHERE id = ?').bind(id).run()
+  await c.env.DB.prepare('UPDATE categories SET is_active = 0 WHERE id = ?').bind(id).run()
   return c.json({ success: true })
 })
