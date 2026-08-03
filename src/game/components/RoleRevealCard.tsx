@@ -11,7 +11,7 @@ const roleMeta: Record<Role, { title: string; blurb: string; color: string; Icon
   },
   skeptic: {
     title: "Skeptic",
-    blurb: "Trust no one. Read the room. Call the bluff, or don't.",
+    blurb: "Trust no one. Decide whether to follow the Seer's pick, or go solo.",
     color: "#F59E0B",
     Icon: Shield,
   },

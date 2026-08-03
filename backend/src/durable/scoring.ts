@@ -1,5 +1,5 @@
 export type Mode = 'solo' | 'seer_skeptic' | 'multiplayer_seer'
-export type Decision = 'follow' | 'bluff' | 'solo'
+export type Decision = 'follow' | 'solo'
 
 export interface ScoreResult {
   tokens: Record<string, number>
@@ -9,9 +9,7 @@ export function computeScores(params: {
   mode: Mode
   isCorrect: Record<string, boolean>
   decisions: Record<string, Decision>
-  trustedSeerId?: string
-  seerIds: string[]
-  skepticId?: string
+  seerId?: string
   allPlayerIds: string[]
 }): ScoreResult {
   const tokens: Record<string, number> = {}
@@ -28,40 +26,29 @@ export function computeScores(params: {
     return { tokens }
   }
 
-  // Seer & Skeptic modes
-  const skepticId = params.skepticId
-  if (!skepticId) return { tokens }
+  // Seer modes: exactly one seer. Every other player decides to follow the
+  // seer's pick or to go solo and trust their own answer.
+  const seerId = params.seerId
+  if (!seerId) return { tokens }
 
-  const isCorrect = params.isCorrect[skepticId] ?? false
-  const decision = params.decisions[skepticId] ?? 'solo'
-  const trustedSeer = params.trustedSeerId
+  const seerCorrect = params.isCorrect[seerId] ?? false
+  const followers = params.allPlayerIds.filter(
+    (pid) => pid !== seerId && params.decisions[pid] === 'follow'
+  )
 
-  if (decision === 'follow') {
-    const trustedCorrect = trustedSeer ? (params.isCorrect[trustedSeer] ?? false) : isCorrect
-    if (trustedCorrect) {
-      // Only trusted seer gets tokens; if only one seer, that's the trusted one
-      if (trustedSeer) tokens[trustedSeer] = 2
-      else if (params.seerIds.length === 1) tokens[params.seerIds[0]] = 2
-      tokens[skepticId] = 2
-    } else {
-      // Persuaded but wrong
-      if (trustedSeer) tokens[trustedSeer] = 1
-      else if (params.seerIds.length === 1) tokens[params.seerIds[0]] = 1
-      tokens[skepticId] = 0
-    }
-  } else if (decision === 'bluff') {
-    if (isCorrect) {
-      // Skeptic called bluff and was right
-      tokens[skepticId] = 2
-      // Seers get 0
-    } else {
-      // Skeptic called bluff but was wrong
-      // No one gets tokens
-    }
-  } else {
-    // 'solo' - went independent
-    if (isCorrect) {
-      tokens[skepticId] = 2
+  if (followers.length > 0) {
+    // Seer earns influence from each player who followed them.
+    tokens[seerId] = seerCorrect ? 2 : followers.length
+  }
+
+  for (const pid of params.allPlayerIds) {
+    if (pid === seerId) continue
+    if (params.decisions[pid] === 'follow') {
+      // Followed the seer: rewarded only when the seer was right.
+      if (seerCorrect) tokens[pid] = 2
+    } else if (params.isCorrect[pid]) {
+      // Went solo and got it right.
+      tokens[pid] = 2
     }
   }
 

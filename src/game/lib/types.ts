@@ -123,8 +123,6 @@ export type Phase =
   | 'lobby'
   | 'role-reveal'
   | 'statement'
-  | 'persuasion'
-  | 'lockin'
   | 'reveal'
   | 'leaderboard'
   | 'final'
@@ -140,7 +138,6 @@ export type WsServerEvent =
   | { type: 'round:role_assigned'; role: Role }
   | { type: 'round:started'; roundNumber: number; statementText: string; statementImageUrl?: string; categoryOptions: ApiCategory[]; timerSeconds: number; timerEnd?: number; roles?: Record<string, Role> }
   | { type: 'seer:clue'; clueVariant: string; cluePayload?: string; clueType?: string; clueContent?: string }
-  | { type: 'round:turn'; speakingUserId: string }
   | { type: 'round:timer_tick'; secondsRemaining: number }
   | { type: 'player:locked'; userId: string }
   | { type: 'seer:pick_revealed'; userId: string; pick: string }
@@ -156,14 +153,11 @@ export type WsClientEvent =
   | { type: 'player:ready' }
   | { type: 'host:start_game' }
   | { type: 'host:set_timer'; seconds: number }
-  | { type: 'host:start_persuasion' }
-  | { type: 'host:start_lockin' }
-  | { type: 'host:next_speaker' }
+  | { type: 'host:set_max_rounds'; rounds: number }
   | { type: 'host:advance_round' }
   | { type: 'host:force_reveal' }
   | { type: 'host:end_game' }
-  | { type: 'skeptic:decision'; decision: 'follow' | 'bluff' | 'solo'; trusted_seer_id?: string }
-  | { type: 'player:lock_answer'; category_id: string }
+  | { type: 'player:lock_answer'; category_id: string; decision?: 'follow' | 'solo'; trusted_seer_id?: string }
 
 export type RoundPlayerAnswer = {
   userId: string
@@ -172,7 +166,7 @@ export type RoundPlayerAnswer = {
   pick?: string
   isCorrect: boolean
   tokensAwarded: number
-  decision?: string
+  decision?: 'follow' | 'solo'
   trustedSeerId?: string
 }
 
@@ -192,7 +186,7 @@ export type WsPlayer = {
   role?: Role
   locked: boolean
   pick?: string
-  decision?: 'follow' | 'bluff' | 'solo'
+  decision?: 'follow' | 'solo'
   trustedSeerId?: string
   tokens: number
 }
@@ -239,7 +233,7 @@ export type PlayerRound = {
   pick?: string
   locked: boolean
   awarded: number
-  decision?: 'follow' | 'bluff' | 'solo'
+  decision?: 'follow' | 'solo'
   trustedSeerId?: string
 }
 

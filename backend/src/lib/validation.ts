@@ -48,10 +48,7 @@ export const createRoomSchema = z.object({
 
 export const lockAnswerSchema = z.object({
   category_id: z.string(),
-})
-
-export const skepticDecisionSchema = z.object({
-  decision: z.enum(['follow', 'bluff', 'solo']),
+  decision: z.enum(['follow', 'solo']).optional(),
   trusted_seer_id: z.string().optional(),
 })
 

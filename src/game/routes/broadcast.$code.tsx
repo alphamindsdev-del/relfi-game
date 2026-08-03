@@ -14,8 +14,6 @@ function mapPhase(backendPhase: string): string {
     lobby: 'lobby',
     role_assignment: 'role-reveal',
     statement_revealed: 'statement',
-    persuasion: 'persuasion',
-    decision: 'lockin',
     reveal: 'reveal',
     leaderboard: 'leaderboard',
     game_ended: 'final',
@@ -31,7 +29,7 @@ type BroadcastState = {
   categories: Category[]
   roundIndex: number
   timerSeconds: number
-  speakingUserId: string | null
+  seerPick: { userId: string; name: string; pick: string } | null
   revealData: any
   standings: any[]
   finalStandings: any[]
@@ -85,7 +83,7 @@ function BroadcastPage() {
         categories: [],
         roundIndex: 0,
         timerSeconds: 45,
-        speakingUserId: null,
+        seerPick: null,
         revealData: null,
         standings: [],
         finalStandings: [],
@@ -116,7 +114,12 @@ function BroadcastPage() {
             })),
             roundIndex: s.roundIndex || 0,
             timerSeconds: s.timerSeconds || 45,
-            speakingUserId: s.speakingUserId || null,
+            seerPick: (() => {
+              const seer = (s.players || []).find((p: any) => p.role === 'seer' && p.pick)
+              return seer
+                ? { userId: seer.userId, name: seer.displayName, pick: seer.pick }
+                : null
+            })(),
           }
         }
         case 'round:started':
@@ -126,6 +129,7 @@ function BroadcastPage() {
             statementText: event.statementText,
             statementImageUrl: event.statementImageUrl || '',
             revealData: null,
+            seerPick: null,
             categories: (event.categoryOptions || []).map((c: any) => ({
               id: c.id,
               name: c.name,
@@ -135,14 +139,12 @@ function BroadcastPage() {
             })),
             timerSeconds: event.timerSeconds,
           }
-        case 'round:turn':
-          return { ...base, speakingUserId: event.speakingUserId }
+        case 'round:reveal':
+          return { ...base, phase: 'reveal', revealData: event, seerPick: null }
         case 'phase:changed':
           return { ...base, phase: mapPhase(event.phase) }
         case 'round:timer_tick':
           return { ...base, timerSeconds: event.secondsRemaining }
-        case 'round:reveal':
-          return { ...base, phase: 'reveal', revealData: event }
         case 'leaderboard:update':
           return {
             ...base,
@@ -244,57 +246,25 @@ function BroadcastPage() {
                 </p>
               )}
             </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <MessageCircle className="h-4 w-4" />
-              Seers are analyzing in the Secret Room
-            </div>
-          </div>
-        )}
-
-        {state.phase === 'persuasion' && (
-          <div className="flex flex-1 flex-col items-center gap-8">
-            <div className="w-full max-w-2xl rounded-2xl border bg-card-elevated p-8 text-center">
-              <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-3">Statement</div>
-              {state.statementImageUrl ? (
-                <img src={state.statementImageUrl} alt="Statement" className="mx-auto max-h-[55vh] w-auto max-w-full rounded-2xl object-contain" />
-              ) : (
-                <p className="font-display text-xl leading-relaxed">{state.statementText}</p>
-              )}
-            </div>
-            <div className="rounded-2xl border border-primary/30 bg-primary/10 p-8 text-center">
-              <div className="text-xs uppercase tracking-widest text-primary mb-2">Now Pitching</div>
-              {state.speakingUserId ? (() => {
-                const speaker = state.players.find((p) => p.id === state.speakingUserId)
-                return speaker ? (
-                  <div className="flex flex-col items-center gap-3">
-                    <Avatar name={speaker.name} hue={speaker.avatarHue} size={80} />
-                    <div className="font-display text-3xl font-bold">{speaker.name}</div>
-                    <div className="flex items-center gap-1.5 text-sm text-primary">
-                      <MessageCircle className="h-4 w-4" /> Seer
-                    </div>
-                  </div>
-                ) : null
-              })() : (
-                <p className="text-muted-foreground">Waiting for host to start...</p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {state.phase === 'lockin' && (
-          <div className="flex flex-1 flex-col items-center gap-8">
-            <div className="w-full max-w-2xl rounded-2xl border bg-card-elevated p-8 text-center">
-              <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-3">Statement</div>
-              {state.statementImageUrl ? (
-                <img src={state.statementImageUrl} alt="Statement" className="mx-auto max-h-[55vh] w-auto max-w-full rounded-2xl object-contain" />
-              ) : (
-                <p className="font-display text-xl leading-relaxed">{state.statementText}</p>
-              )}
-            </div>
-            <div className="flex items-center gap-3 text-lg">
-              <LockIcon className="h-6 w-6 text-primary" />
-              <span className="font-semibold text-muted-foreground">Lock-in in progress...</span>
-            </div>
+            {state.seerPick ? (
+              <div className="rounded-2xl border border-primary/30 bg-primary/10 p-8 text-center">
+                <div className="text-xs uppercase tracking-widest text-primary mb-2">The Seer has picked</div>
+                <div className="flex flex-col items-center gap-3">
+                  <Avatar name={state.seerPick.name} hue={(state.players.find((p) => p.id === state.seerPick?.userId)?.avatarHue) || 0} size={64} />
+                  <div className="font-display text-xl font-bold">{state.seerPick.name}</div>
+                  {(() => {
+                    const cat = state.categories.find((c) => c.id === state.seerPick?.pick)
+                    return cat ? <CategoryChip category={cat} selected /> : null
+                  })()}
+                </div>
+                <p className="mt-4 text-sm text-muted-foreground">Others are choosing to follow the Seer or go solo</p>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <MessageCircle className="h-4 w-4" />
+                The Seer is analyzing in the Secret Room
+              </div>
+            )}
           </div>
         )}
 
@@ -333,15 +303,6 @@ function BroadcastPage() {
       </div>
     </div>
   );
-}
-
-function LockIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-      <path d="M7 11V7a5 5 0 0110 0v4" />
-    </svg>
-  )
 }
 
 function RevealContent({ revealData, players }: { revealData: any; players: PlayerType[] }) {

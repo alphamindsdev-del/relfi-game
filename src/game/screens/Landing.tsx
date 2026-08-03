@@ -34,6 +34,7 @@ export function Landing() {
   const [selectedDeckId, setSelectedDeckId] = useState("");
   const [selectedMode, setSelectedMode] = useState<"seer_skeptic" | "multiplayer_seer" | "solo">("seer_skeptic");
   const [timerSeconds, setTimerSeconds] = useState(45);
+  const [gameRounds, setGameRounds] = useState(5);
   const [loading, setLoading] = useState(false);
   const [joinError, setJoinError] = useState("");
   const [pendingJoinCode, setPendingJoinCode] = useState("");
@@ -82,6 +83,10 @@ export function Landing() {
   useEffect(() => {
     useGame.setState({ timerSeconds })
   }, [timerSeconds])
+
+  useEffect(() => {
+    useGame.setState({ maxRounds: gameRounds })
+  }, [gameRounds])
 
   async function handleJoin(e: React.FormEvent) {
     e.preventDefault()
@@ -263,6 +268,28 @@ export function Landing() {
                     <span>15s</span>
                     <span>120s</span>
                   </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs uppercase tracking-widest text-muted-foreground">
+                    Number of Rounds: {gameRounds}
+                  </label>
+                  <input
+                    type="range"
+                    min={1}
+                    max={20}
+                    step={1}
+                    value={gameRounds}
+                    onChange={(e) => setGameRounds(Number(e.target.value))}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-[10px] text-muted-foreground">
+                    <span>1</span>
+                    <span>20</span>
+                  </div>
+                  <p className="text-[10px] text-primary/80">
+                    Pick how long the game lasts — it ends after these rounds.
+                  </p>
                 </div>
               </>
             )}

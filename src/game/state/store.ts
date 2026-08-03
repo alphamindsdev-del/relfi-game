@@ -25,12 +25,12 @@ type Store = {
   clue: { variant: string; payload?: string; clueType?: string; clueContent?: string } | null
   timerSeconds: number
   timerEnd: number
+  maxRounds: number
   lobbyCountdown: number
   frictionExplanation: string
   revealData: any
   standings: any[]
   finalStandings: any[]
-  speakingUserId: string | null
   seerPicks: Record<string, string>
   connected: boolean
   error: string | null
@@ -45,16 +45,13 @@ type Store = {
   startLocalGame: () => void
   startGame: () => void
   setPick: (playerId: string, categoryId: string) => void
-  lockIn: (playerId: string, categoryId: string) => void
+  lockIn: (playerId: string, categoryId: string, decision?: 'follow' | 'solo', trustedSeerId?: string) => void
   hostStartGame: () => void
   hostSetTimer: (seconds: number) => void
-  hostStartPersuasion: () => void
-  hostStartLockin: () => void
+  hostSetMaxRounds: (rounds: number) => void
   hostAdvanceRound: () => void
   hostForceReveal: () => void
   hostEndGame: () => void
-  hostNextSpeaker: () => void
-  skepticDecision: (decision: 'follow' | 'bluff' | 'solo', trustedSeerId?: string) => void
   playerReady: () => void
   resetGame: () => void
   applyWsEvent: (event: WsServerEvent) => void
@@ -80,12 +77,12 @@ export const useGame = create<Store>((set, get) => ({
   clue: null,
   timerSeconds: 45,
   timerEnd: 0,
+  maxRounds: 5,
   lobbyCountdown: 0,
   frictionExplanation: '',
   revealData: null,
   standings: [],
   finalStandings: [],
-  speakingUserId: null as string | null,
   seerPicks: {},
   connected: false,
   error: null,
@@ -160,9 +157,13 @@ export const useGame = create<Store>((set, get) => ({
     }
     set({ roomCode: room_code, roomId: room_id, hostUserId: youId, deckId, mode: mode as any, phase: 'lobby', youId })
     const timer = get().timerSeconds
+    const rounds = get().maxRounds
     get().connect(room_id, ticket, room_code)
     if (timer !== 45) {
       setTimeout(() => relfiSocket.send({ type: 'host:set_timer', seconds: timer }), 2000)
+    }
+    if (rounds > 0) {
+      setTimeout(() => relfiSocket.send({ type: 'host:set_max_rounds', rounds }), 2000)
     }
   },
 
@@ -186,31 +187,19 @@ export const useGame = create<Store>((set, get) => ({
     set((s) => ({ round: { ...s.round, [playerId]: { ...s.round[playerId], pick: categoryId } } }))
   },
 
-  lockIn: (playerId, categoryId) => {
+  lockIn: (playerId, categoryId, decision?: 'follow' | 'solo', trustedSeerId?: string) => {
     set((s) => ({
-      round: { ...s.round, [playerId]: { ...s.round[playerId], pick: categoryId, locked: true } },
+      round: { ...s.round, [playerId]: { ...s.round[playerId], pick: categoryId, locked: true, decision, trustedSeerId } },
     }))
-    relfiSocket.send({ type: 'player:lock_answer', category_id: categoryId })
+    relfiSocket.send({ type: 'player:lock_answer', category_id: categoryId, decision, trusted_seer_id: trustedSeerId })
   },
 
   hostStartGame: () => relfiSocket.send({ type: 'host:start_game' }),
   hostSetTimer: (seconds) => relfiSocket.send({ type: 'host:set_timer', seconds }),
-  hostStartPersuasion: () => relfiSocket.send({ type: 'host:start_persuasion' }),
-  hostStartLockin: () => relfiSocket.send({ type: 'host:start_lockin' }),
+  hostSetMaxRounds: (rounds) => relfiSocket.send({ type: 'host:set_max_rounds', rounds }),
   hostAdvanceRound: () => relfiSocket.send({ type: 'host:advance_round' }),
   hostForceReveal: () => relfiSocket.send({ type: 'host:force_reveal' }),
   hostEndGame: () => relfiSocket.send({ type: 'host:end_game' }),
-  hostNextSpeaker: () => relfiSocket.send({ type: 'host:next_speaker' }),
-
-  skepticDecision: (decision, trustedSeerId) => {
-    relfiSocket.send({ type: 'skeptic:decision', decision, trusted_seer_id: trustedSeerId })
-    set((s) => ({
-      round: {
-        ...s.round,
-        [s.youId]: { ...s.round[s.youId], decision, trustedSeerId },
-      },
-    }))
-  },
 
   playerReady: () => relfiSocket.send({ type: 'player:ready' }),
 
@@ -225,8 +214,8 @@ export const useGame = create<Store>((set, get) => ({
     set({
       phase: 'landing', roomCode: '', roomId: '', hostUserId: '', connected: false,
       players: [], round: {}, categories: [], youRole: null, clue: null,
-      roundIndex: 0, standings: [], finalStandings: [], speakingUserId: null, seerPicks: {}, error: null,
-      statementText: '', statementImageUrl: '',
+      roundIndex: 0, standings: [], finalStandings: [], seerPicks: {}, error: null,
+      statementText: '', statementImageUrl: '', maxRounds: 5,
     })
   },
 
@@ -242,7 +231,7 @@ export const useGame = create<Store>((set, get) => ({
         const me = s.players?.find((p: any) => p.userId === youId)
         const mappedPhase = mapPhase(s.phase)
         const round: Record<string, PlayerRound> = {}
-        if (mappedPhase === 'statement' || mappedPhase === 'persuasion' || mappedPhase === 'lockin') {
+        if (mappedPhase === 'statement') {
           players.forEach((p) => {
             const serverP = s.players?.find((sp: any) => sp.userId === p.id)
             round[p.id] = {
@@ -267,7 +256,7 @@ export const useGame = create<Store>((set, get) => ({
           statementImageUrl: s.statementImageUrl || '',
           timerSeconds: s.timerSeconds || 45,
           timerEnd: s.timerEnd || 0,
-          speakingUserId: s.speakingUserId || null,
+          maxRounds: s.maxRounds || 0,
           seerPicks: s.players?.reduce((acc: Record<string, string>, p: any) => {
             if (p.role === 'seer' && p.pick) acc[p.userId] = p.pick
             return acc
@@ -312,7 +301,7 @@ export const useGame = create<Store>((set, get) => ({
           round[p.id] = { playerId: p.id, role, locked: false, awarded: 0 }
         })
         const serverYouRole = roles[get().youId]
-        set({ phase: 'statement', cardId: undefined, statementText: event.statementText, statementImageUrl: event.statementImageUrl || '', roundIndex: event.roundNumber - 1, categories: cats, timerSeconds: event.timerSeconds, timerEnd: event.timerEnd || 0, round, clue: null, frictionExplanation: '', revealData: null, speakingUserId: null, seerPicks: {}, lobbyCountdown: 0, youRole: serverYouRole || get().youRole })
+        set({ phase: 'statement', cardId: undefined, statementText: event.statementText, statementImageUrl: event.statementImageUrl || '', roundIndex: event.roundNumber - 1, categories: cats, timerSeconds: event.timerSeconds, timerEnd: event.timerEnd || 0, round, clue: null, frictionExplanation: '', revealData: null, seerPicks: {}, lobbyCountdown: 0, youRole: serverYouRole || get().youRole })
         break
       }
 
@@ -325,10 +314,6 @@ export const useGame = create<Store>((set, get) => ({
             clueContent: (event as any).clueContent,
           }
         })
-        break
-
-      case 'round:turn':
-        set({ speakingUserId: event.speakingUserId || null })
         break
 
       case 'player:locked':
@@ -418,20 +403,8 @@ export const useGame = create<Store>((set, get) => ({
         const update: Partial<Store> = { phase: mapped }
         if ((event as any).seconds) update.timerSeconds = (event as any).seconds
         if ((event as any).timerEnd) update.timerEnd = (event as any).timerEnd
+        if ((event as any).maxRounds) update.maxRounds = (event as any).maxRounds
         set(update)
-        if (mapped === 'persuasion' || mapped === 'lockin') {
-          const round: Record<string, PlayerRound> = {}
-          get().players.forEach((p) => {
-            const existing = get().round[p.id]
-            round[p.id] = existing || {
-              playerId: p.id,
-              role: 'solo',
-              locked: false,
-              awarded: 0,
-            }
-          })
-          set({ round })
-        }
         break
       }
 
@@ -447,8 +420,6 @@ function mapPhase(backendPhase: string): Phase {
     lobby: 'lobby',
     role_assignment: 'role-reveal',
     statement_revealed: 'statement',
-    persuasion: 'persuasion',
-    decision: 'lockin',
     reveal: 'reveal',
     leaderboard: 'leaderboard',
     game_ended: 'final',

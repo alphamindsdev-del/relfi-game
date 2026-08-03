@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Eye, LogOut, XCircle, ArrowRight, ThumbsUp, UserX } from "lucide-react";
+import { Eye, LogOut, XCircle, ArrowRight, ThumbsUp } from "lucide-react";
 import { CategoryChip } from "../components/CategoryChip";
 import { CountdownRing } from "../components/CountdownRing";
 import { SecretRoomModal } from "../components/SecretRoomModal";
@@ -23,8 +23,9 @@ export function Statement() {
   const timerSeconds = useGame((s) => s.timerSeconds);
   const timerEnd = useGame((s) => s.timerEnd);
   const soundOn = useGame((s) => s.soundOn);
-  const phase = useGame((s) => s.phase);
   const youRole = useGame((s) => s.youRole);
+  const mode = useGame((s) => s.mode);
+  const maxRounds = useGame((s) => s.maxRounds);
   const hostUserId = useGame((s) => s.hostUserId);
   const seerPicks = useGame((s) => s.seerPicks);
   const statementImageUrl = useGame((s) => s.statementImageUrl);
@@ -33,34 +34,30 @@ export function Statement() {
 
   const setPick = useGame((s) => s.setPick);
   const lockIn = useGame((s) => s.lockIn);
-  const hostStartPersuasion = useGame((s) => s.hostStartPersuasion);
   const hostForceReveal = useGame((s) => s.hostForceReveal);
   const hostEndGame = useGame((s) => s.hostEndGame);
-  const skepticDecision = useGame((s) => s.skepticDecision);
   const resetGame = useGame((s) => s.resetGame);
 
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [secretOpen, setSecretOpen] = useState(false);
-  const [skepticChosen, setSkepticChosen] = useState<'follow' | 'solo' | null>(null);
-  const [trustedSeerId, setTrustedSeerId] = useState<string | undefined>(undefined);
 
   const clueVariant = useMemo(() => {
     if (!clue) return { kind: 'none' as const }
     return parseClueVariant(clue.variant, clue.payload, clue.clueType, clue.clueContent)
   }, [clue])
 
-  const isLockin = phase === 'lockin';
-  const isStatement = phase === 'statement';
   const isSeer = youRole === 'seer';
+  const isSoloMode = mode === 'solo';
 
   if (!you) return null;
   const locked = you.locked;
   const waitingOthers = Object.values(round).filter((r) => !r.locked && r.playerId !== youId);
 
-  // Find seers who have revealed their picks
-  const revealedSeers = players.filter((p) => seerPicks[p.id])
-  const currentCategory = (id: string) => categories.find((c) => c.id === id)
+  // There is exactly one seer per round; find them if they have revealed their pick.
+  const revealedSeer = players.find((p) => seerPicks[p.id]);
+  const seerPick = revealedSeer ? seerPicks[revealedSeer.id] : undefined;
+  const currentCategory = (id: string) => categories.find((c) => c.id === id);
 
   const handleLock = () => {
     if (!you.pick) return
@@ -73,18 +70,14 @@ export function Statement() {
     setPick(youId, categoryId)
   }
 
-  const handleSkepticFollow = () => {
-    if (!trustedSeerId || !seerPicks[trustedSeerId]) return
-    const seerPick = seerPicks[trustedSeerId]
-    skepticDecision('follow', trustedSeerId)
-    setPick(youId, seerPick)
-    lockIn(youId, seerPick)
+  const handleFollow = () => {
+    if (!revealedSeer || !seerPick) return
+    lockIn(youId, seerPick, 'follow', revealedSeer.id)
   }
 
-  const handleSkepticSolo = () => {
+  const handleSolo = () => {
     if (!you.pick) return
-    skepticDecision('solo', undefined)
-    lockIn(youId, you.pick)
+    lockIn(youId, you.pick, 'solo')
   }
 
   return (
@@ -99,7 +92,7 @@ export function Statement() {
             <LogOut className="h-4 w-4" />
           </button>
           <div className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
-            Round {roundIndex + 1} {isLockin ? ': Lock in' : ''}
+            Round {roundIndex + 1}{maxRounds > 0 ? ` of ${maxRounds}` : ''}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -138,31 +131,48 @@ export function Statement() {
         </div>
       </div>
 
-      {/* Seer: reveal picks from seers who have locked */}
-      {revealedSeers.length > 0 && (
-        <div className="mt-6 w-full space-y-2">
-          <div className="text-xs uppercase tracking-widest text-primary">Seer Picks Revealed</div>
-          {revealedSeers.map((seer) => {
-            const cat = currentCategory(seerPicks[seer.id])
-            return (
-              <div key={seer.id} className="flex items-center gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-3">
-                <div className="flex-1">
-                  <div className="text-sm font-semibold">{seer.name}</div>
-                  <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Seer</div>
-                </div>
-                {cat && (
-                  <CategoryChip category={cat} selected disabled />
-                )}
+      {isSeer && (
+        <div className="mt-6 w-full">
+          {!locked && (
+            <div className="mb-3 text-xs uppercase tracking-widest text-primary">Pick your mapping</div>
+          )}
+          {!locked ? (
+            <>
+              <div className="flex flex-wrap justify-center gap-2 md:gap-3">
+                {categories.map((c) => (
+                  <CategoryChip
+                    key={c.id}
+                    category={c}
+                    selected={you.pick === c.id}
+                    disabled={locked}
+                    onClick={() => handlePick(c.id)}
+                  />
+                ))}
               </div>
-            )
-          })}
+              <div className="mt-6 text-center">
+                <LockInButton disabled={!you.pick} locked={locked} onLock={handleLock} />
+              </div>
+            </>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="rounded-2xl border border-primary/30 bg-primary/10 p-6 text-center"
+            >
+              <Eye className="mx-auto h-6 w-6 text-primary" />
+              <div className="mt-2 font-display text-lg font-bold">Your pick is locked</div>
+              <div className="text-xs text-muted-foreground">
+                The others can now follow your pick or go solo.
+              </div>
+            </motion.div>
+          )}
         </div>
       )}
 
-      {/* Seer: pick during statement phase (before persuasion) */}
-      {isStatement && isSeer && !locked && (
+      {/* Non-seer answering: wait for the Seer to map first, then follow or go solo */}
+      {!isSeer && isSoloMode && (
         <div className="mt-8 w-full">
-          <div className="mb-3 text-xs uppercase tracking-widest text-primary">Pick your mapping</div>
+          <div className="mb-3 text-xs uppercase tracking-widest text-muted-foreground">Pick your mapping</div>
           <div className="flex flex-wrap justify-center gap-2 md:gap-3">
             {categories.map((c) => (
               <CategoryChip
@@ -174,184 +184,78 @@ export function Statement() {
               />
             ))}
           </div>
-          <div className="mt-6 text-center">
+          <div className="mt-6">
             <LockInButton disabled={!you.pick} locked={locked} onLock={handleLock} />
           </div>
         </div>
       )}
 
-      {/* Seer: already locked during statement */}
-      {isStatement && isSeer && locked && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="mt-8 rounded-2xl border border-primary/30 bg-primary/10 p-6 text-center"
-        >
-          <Eye className="mx-auto h-6 w-6 text-primary" />
-          <div className="mt-2 font-display text-lg font-bold">Your pick is locked</div>
-          <div className="text-xs text-muted-foreground">Other players can see your mapping</div>
-        </motion.div>
-      )}
-
-      {/* Secret Room button for seers */}
-      {isSeer && (
-        <motion.button
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          onClick={() => setSecretOpen(true)}
-          className="mt-4 inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-5 py-2.5 text-sm font-semibold text-primary hover:bg-primary/20"
-        >
-          <Eye className="h-4 w-4" />
-          {isStatement ? 'Open Secret Room' : 'View Secret Room'}
-        </motion.button>
-      )}
-
-      {/* Non-seer: waiting during statement phase */}
-      {isStatement && !isSeer && (
-        <div className="mt-10 text-center text-sm text-muted-foreground animate-heartbeat">
-          Seers are analyzing the statement...
-        </div>
-      )}
-
-      {/* Host: start persuasion button (only in statement phase) */}
-      {isStatement && isHost && (
-        <div className="mt-10 flex flex-col items-center gap-4">
-          <button
-            onClick={hostStartPersuasion}
-            className="inline-flex items-center gap-2 rounded-full bg-primary-gradient px-8 py-4 font-display font-bold uppercase tracking-widest text-primary-foreground shadow-lock"
-          >
-            <ArrowRight className="h-4 w-4" /> Start Persuasion
-          </button>
-        </div>
-      )}
-
-      {/* Host: skip the lock-in countdown and reveal now */}
-      {isLockin && isHost && (
-        <div className="mt-10 flex flex-col items-center gap-4">
-          <button
-            onClick={hostForceReveal}
-            className="inline-flex items-center gap-2 rounded-full border border-primary/50 bg-primary/10 px-8 py-4 font-display font-bold uppercase tracking-widest text-primary hover:bg-primary/20 shadow-lock"
-          >
-            <ArrowRight className="h-4 w-4" /> Reveal Now
-          </button>
-        </div>
-      )}
-
-      {/* Lock-in phase: skeptic decision */}
-      {isLockin && youRole === 'skeptic' && !locked && !skepticChosen && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mt-8 w-full max-w-md"
-        >
-          <div className="mb-4 text-center text-xs uppercase tracking-widest text-primary">
-            Make your decision
-          </div>
-
-          <div className="space-y-2">
-            {revealedSeers.map((seer) => {
-              const cat = currentCategory(seerPicks[seer.id])
-              return (
-                <button
-                  key={seer.id}
-                  onClick={() => { setTrustedSeerId(seer.id); setSkepticChosen('follow') }}
-                  className={`w-full rounded-2xl border p-4 text-left transition ${
-                    trustedSeerId === seer.id ? 'border-primary bg-primary/10' : 'hover:bg-card'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <ThumbsUp className={`h-5 w-5 ${trustedSeerId === seer.id ? 'text-primary' : 'text-muted-foreground'}`} />
-                    <div>
-                      <div className="font-semibold">Follow {seer.name}</div>
-                      {cat && <div className="text-xs text-muted-foreground">Lock {cat.name}</div>}
-                    </div>
-                  </div>
-                </button>
-              )
-            })}
-            <button
-              onClick={() => { setTrustedSeerId(undefined); setSkepticChosen('solo') }}
-              className={`w-full rounded-2xl border p-4 text-left transition ${
-                skepticChosen === 'solo' && !trustedSeerId ? 'border-muted-foreground bg-muted/30' : 'hover:bg-card'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <UserX className="h-6 w-6 text-muted-foreground" />
-                <div>
-                  <div className="font-semibold">Go Solo</div>
-                  <div className="text-xs text-muted-foreground">Pick your own category</div>
-                </div>
-              </div>
-            </button>
-          </div>
-
-          {skepticChosen === 'follow' && trustedSeerId && (
-            <button
-              onClick={handleSkepticFollow}
-              className="mt-4 w-full rounded-2xl bg-primary-gradient px-6 py-4 font-bold text-primary-foreground shadow-lock"
-            >
-              Confirm: Follow the Seer
-            </button>
-          )}
-
-          {skepticChosen === 'solo' && (
-            <div className="mt-6">
-              <div className="mb-3 text-xs uppercase tracking-widest text-muted-foreground">Pick your category</div>
-              <div className="flex flex-wrap justify-center gap-2">
+      {!isSeer && !isSoloMode && (
+        <div className="mt-8 w-full">
+          {!revealedSeer && (
+            <>
+              <p className="mb-4 text-center text-sm text-muted-foreground animate-heartbeat">
+                Waiting for the Seer to map first...
+              </p>
+              <div className="flex flex-wrap justify-center gap-2 md:gap-3 opacity-60">
                 {categories.map((c) => (
-                  <CategoryChip
-                    key={c.id}
-                    category={c}
-                    selected={you.pick === c.id}
-                    onClick={() => handlePick(c.id)}
-                  />
+                  <CategoryChip key={c.id} category={c} disabled />
                 ))}
               </div>
-              <button
-                onClick={handleSkepticSolo}
-                disabled={!you.pick}
-                className="mt-4 w-full rounded-2xl bg-primary-gradient px-6 py-4 font-bold text-primary-foreground shadow-lock disabled:opacity-50"
-              >
-                Lock Solo Pick
-              </button>
-            </div>
+            </>
           )}
-        </motion.div>
-      )}
 
-      {/* Skeptic locked confirmation */}
-      {isLockin && youRole === 'skeptic' && locked && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="mt-8 rounded-2xl border border-primary/30 bg-primary/5 p-6 text-center"
-        >
-          <div className="text-xs uppercase tracking-widest text-primary">Decision Locked</div>
-          <div className="mt-2 font-display text-2xl font-bold capitalize">
-            {you.decision === 'follow' ? 'Following the Seer' : 'Going Solo'}
-          </div>
-        </motion.div>
-      )}
+          {revealedSeer && seerPick && (
+            <>
+              <div className="mb-4 rounded-2xl border border-primary/20 bg-primary/5 p-3">
+                <div className="text-xs uppercase tracking-widest text-muted-foreground">The Seer mapped</div>
+                <div className="mt-1 flex items-center gap-3">
+                  <div className="text-sm font-semibold">{revealedSeer.name}</div>
+                  {currentCategory(seerPick) && (
+                    <CategoryChip category={currentCategory(seerPick)!} selected disabled />
+                  )}
+                </div>
+              </div>
 
-      {/* Lock-in phase: non-skeptics pick normally */}
-      {isLockin && youRole !== 'skeptic' && (
-        <>
-          <div className="mt-8 flex flex-wrap justify-center gap-2 md:gap-3">
-            {categories.map((c) => (
-              <CategoryChip
-                key={c.id}
-                category={c}
-                selected={you.pick === c.id}
-                disabled={locked}
-                onClick={() => handlePick(c.id)}
-              />
-            ))}
-          </div>
-          <div className="mt-10">
-            <LockInButton disabled={!you.pick} locked={locked} onLock={handleLock} />
-          </div>
-        </>
+              {!locked ? (
+                <>
+                  <button
+                    onClick={handleFollow}
+                    className="mt-2 flex w-full items-center gap-3 rounded-2xl border p-4 text-left transition hover:bg-card"
+                  >
+                    <ThumbsUp className="h-5 w-5 text-primary" />
+                    <div>
+                      <div className="font-semibold">Follow the Seer</div>
+                      <div className="text-xs text-muted-foreground">
+                        Lock the Seer&apos;s pick. If the Seer is right, you both earn.
+                      </div>
+                    </div>
+                  </button>
+
+                  <div className="mb-3 mt-6 text-center text-xs uppercase tracking-widest text-muted-foreground">
+                    Or go solo — choose your own mapping
+                  </div>
+                  <div className="flex flex-wrap justify-center gap-2 md:gap-3">
+                    {categories.map((c) => (
+                      <CategoryChip
+                        key={c.id}
+                        category={c}
+                        selected={you.pick === c.id}
+                        disabled={locked}
+                        onClick={() => handlePick(c.id)}
+                      />
+                    ))}
+                  </div>
+                  <div className="mt-6">
+                    <LockInButton disabled={!you.pick} locked={locked} onLock={handleSolo} />
+                  </div>
+                </>
+              ) : (
+                <p className="mt-4 text-center text-sm text-muted-foreground">Your pick is locked.</p>
+              )}
+            </>
+          )}
+        </div>
       )}
 
       {locked && (
@@ -366,6 +270,32 @@ export function Statement() {
             size={28}
           />
         </motion.div>
+      )}
+
+      {/* Secret Room button for the seer */}
+      {isSeer && (
+        <motion.button
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          onClick={() => setSecretOpen(true)}
+          className="mt-4 inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-5 py-2.5 text-sm font-semibold text-primary hover:bg-primary/20"
+        >
+          <Eye className="h-4 w-4" />
+          View Secret Room
+        </motion.button>
+      )}
+
+      {/* Host: reveal now */}
+      {isHost && !locked && (
+        <div className="mt-10 flex flex-col items-center gap-4">
+          <button
+            onClick={hostForceReveal}
+            className="inline-flex items-center gap-2 rounded-full border border-primary/50 bg-primary/10 px-8 py-4 font-display font-bold uppercase tracking-widest text-primary hover:bg-primary/20 shadow-lock"
+          >
+            <ArrowRight className="h-4 w-4" /> Reveal Now
+          </button>
+        </div>
       )}
 
       <SecretRoomModal

@@ -39,7 +39,7 @@ export function SecretRoomModal({
           >
             <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-primary">
               <Lock className="h-3.5 w-3.5" />
-              Secret Room: Seers only
+              Secret Room: Seer only
             </div>
             <h3 className="mt-3 font-display text-2xl font-bold">Your clue</h3>
 
@@ -76,7 +76,7 @@ export function SecretRoomModal({
                     <CategoryChip category={categories.find((c) => c.id === clue.categoryId)!} selected size="lg" />
                   </div>
                   <p className="mt-3 text-xs text-muted-foreground">
-                    You know the truth. Don't be too obvious. You have to convince the Skeptic.
+                    You know the truth. Don't be too obvious. Persuade the others to follow your pick.
                   </p>
                 </div>
               )}

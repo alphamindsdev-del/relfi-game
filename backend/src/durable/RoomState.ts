@@ -1,7 +1,7 @@
 import { DurableObject } from 'cloudflare:workers'
 import { computeScores, type Mode, type Decision } from './scoring'
 
-export type Phase = 'lobby' | 'role_assignment' | 'statement_revealed' | 'persuasion' | 'decision' | 'reveal' | 'leaderboard' | 'game_ended'
+export type Phase = 'lobby' | 'role_assignment' | 'statement_revealed' | 'reveal' | 'leaderboard' | 'game_ended'
 
 interface PlayerState {
   userId: string
@@ -46,8 +46,7 @@ interface RoomStorage {
   statementImageUrl?: string
   correctCategoryId?: string
   categoryOptions: { id: string; name: string; color_hex: string; icon_key?: string; short_code?: string }[]
-  skepticIndex: number
-  currentSpeakerIndex: number
+  seerIndex: number
   timerEnd?: number
   roundStartTime?: number
   initialized: boolean
@@ -63,7 +62,6 @@ type ServerEvent =
   | { type: 'round:role_assigned'; role: 'seer' | 'skeptic' | 'solo' }
   | { type: 'round:started'; roundNumber: number; statementText: string; statementImageUrl?: string; categoryOptions: any[]; timerSeconds: number; timerEnd?: number; roles?: Record<string, 'seer' | 'skeptic' | 'solo'> }
   | { type: 'seer:clue'; clueVariant: string; cluePayload?: string; clueType?: string; clueContent?: string }
-  | { type: 'round:turn'; speakingUserId: string }
   | { type: 'round:timer_tick'; secondsRemaining: number }
   | { type: 'player:locked'; userId: string; pick?: string }
   | { type: 'seer:pick_revealed'; userId: string; pick: string }
@@ -72,7 +70,7 @@ type ServerEvent =
   | { type: 'game:ended'; finalStandings: any[] }
   | { type: 'lobby:countdown'; seconds: number }
   | { type: 'host:changed'; hostUserId: string }
-  | { type: 'phase:changed'; phase: Phase; seconds?: number; timerEnd?: number }
+  | { type: 'phase:changed'; phase: Phase; seconds?: number; timerEnd?: number; maxRounds?: number }
   | { type: 'error'; code: string; message: string }
 
 export class RoomState extends DurableObject {
@@ -96,8 +94,7 @@ export class RoomState extends DurableObject {
       maxRounds: 10,
       cardIds: [],
       categoryOptions: [],
-      skepticIndex: 0,
-      currentSpeakerIndex: 0,
+      seerIndex: 0,
       initialized: false,
       timerSeconds: 45,
     }
@@ -121,7 +118,7 @@ export class RoomState extends DurableObject {
     if (this.storage.initialized) return
 
     // If the DO was evicted and cold-started, restore the full in-memory
-    // game state (phase, roles, picks, skepticIndex, ...) from durable
+    // game state (phase, roles, picks, seerIndex, ...) from durable
     // storage so a live game never silently resets to the lobby.
     await this.restore(roomId)
     if (this.storage.initialized) return
@@ -390,41 +387,12 @@ export class RoomState extends DurableObject {
         break
       }
 
-      case 'host:start_persuasion': {
+      case 'host:set_max_rounds': {
         if (userId !== this.storage.hostUserId) return
-        if (this.storage.phase !== 'statement_revealed') return
-        this.ctx.storage.deleteAlarm() // cancel pending alarm from statement phase
-        this.storage.phase = 'persuasion'
-        this.storage.currentSpeakerIndex = 0
-        this.storage.timerEnd = Date.now() + this.storage.timerSeconds * 1000
-        this.broadcast({ type: 'phase:changed', phase: 'persuasion', timerEnd: this.storage.timerEnd })
-
-        const seers = this.storage.players.filter((p) => p.role === 'seer')
-        if (seers.length > 0) {
-          this.broadcast({ type: 'round:turn', speakingUserId: seers[0].userId })
-        }
-        this.ctx.storage.setAlarm(this.storage.timerEnd)
-        break
-      }
-
-      case 'host:start_lockin': {
-        if (userId !== this.storage.hostUserId) return
-        if (this.storage.phase !== 'persuasion') return
-        this.ctx.storage.deleteAlarm() // cancel pending alarm
-        this.storage.phase = 'decision'
-        this.storage.timerEnd = Date.now() + this.storage.timerSeconds * 1000
-        this.broadcast({ type: 'phase:changed', phase: 'decision', timerEnd: this.storage.timerEnd })
-        this.ctx.storage.setAlarm(this.storage.timerEnd)
-        break
-      }
-
-      case 'host:next_speaker': {
-        if (userId !== this.storage.hostUserId) return
-        const seers = this.storage.players.filter((p) => p.role === 'seer')
-        this.storage.currentSpeakerIndex =
-          (this.storage.currentSpeakerIndex + 1) % (seers.length || 1)
-        const speaker = seers[this.storage.currentSpeakerIndex]
-        if (speaker) this.broadcast({ type: 'round:turn', speakingUserId: speaker.userId })
+        const cap = Math.max(1, this.storage.cardIds.length)
+        const rounds = Math.max(1, Math.min(parseInt(event.rounds, 10) || cap, cap))
+        this.storage.maxRounds = rounds
+        this.broadcast({ type: 'phase:changed', phase: this.storage.phase, maxRounds: rounds })
         break
       }
 
@@ -437,12 +405,13 @@ export class RoomState extends DurableObject {
 
       case 'host:force_reveal': {
         if (userId !== this.storage.hostUserId) return
-        if (this.storage.phase !== 'decision') return
+        if (this.storage.phase !== 'statement_revealed') return
         this.ctx.storage.deleteAlarm()
         for (const p of this.storage.players) {
           if (!p.locked && p.connected) {
             p.locked = true
             p.pick = p.pick || this.storage.categoryOptions[0]?.id
+            p.decision = p.role === 'seer' ? undefined : 'solo'
           }
         }
         await this.doReveal()
@@ -461,55 +430,32 @@ export class RoomState extends DurableObject {
       case 'player:lock_answer': {
         const player = this.storage.players.find((p) => p.userId === userId)
         if (!player || player.locked) return
-        // Only allow locks during statement (seer) or decision (everyone else)
-        if (this.storage.phase !== 'statement_revealed' && this.storage.phase !== 'decision') return
+        // Single answering phase: everyone locks here (seer and followers alike)
+        if (this.storage.phase !== 'statement_revealed') return
         player.locked = true
         player.pick = event.category_id
-        this.broadcast({ type: 'player:locked', userId, pick: event.category_id })
+        player.decision = event.decision || undefined
+        player.trustedSeerId = event.trusted_seer_id || undefined
 
-        // If a seer locks, reveal their pick to all (in any valid phase)
+        // A "follow" lock must mirror the seer's actual pick so the score and
+        // the revealed answer stay consistent with the seer's choice.
         if (player.role === 'seer') {
           this.broadcast({ type: 'seer:pick_revealed', userId, pick: event.category_id })
-        }
-
-        // If skeptic follows, ensure pick matches trusted seer's pick
-        if (player.role === 'skeptic' && player.decision === 'follow' && player.trustedSeerId) {
-          const trustedSeer = this.storage.players.find((p) => p.userId === player.trustedSeerId)
-          if (trustedSeer?.pick) {
-            player.pick = trustedSeer.pick
+        } else if (player.decision === 'follow') {
+          const seers = this.storage.players.filter((p) => p.role === 'seer' && p.pick)
+          const seer = this.storage.players.find(
+            (p) => p.userId === player.trustedSeerId && p.role === 'seer'
+          ) || seers[0]
+          if (seer?.pick) {
+            player.pick = seer.pick
+            player.trustedSeerId = seer.userId
           }
         }
+        this.broadcast({ type: 'player:locked', userId, pick: player.pick })
 
         const connected = this.storage.players.filter((p) => p.connected)
         const allLocked = connected.length === 0 || connected.every((p) => p.locked)
-        if (allLocked || this.storage.mode === 'solo') await this.doReveal()
-
-        // Pacing: once every Seer has locked their pick, don't make everyone
-        // wait out the rest of the statement timer. Move straight to persuasion.
-        if (this.storage.phase === 'statement_revealed' && this.storage.mode !== 'solo') {
-          const seers = this.storage.players.filter((p) => p.role === 'seer')
-          const allSeersLocked = seers.length > 0 && seers.every((p) => p.locked)
-          if (allSeersLocked) {
-            this.ctx.storage.deleteAlarm()
-            this.storage.phase = 'persuasion'
-            this.storage.currentSpeakerIndex = 0
-            this.storage.timerEnd = Date.now() + this.storage.timerSeconds * 1000
-            this.broadcast({ type: 'phase:changed', phase: 'persuasion', timerEnd: this.storage.timerEnd })
-            const firstSeer = seers[0]
-            if (firstSeer) this.broadcast({ type: 'round:turn', speakingUserId: firstSeer.userId })
-            this.ctx.storage.setAlarm(this.storage.timerEnd)
-          }
-        }
-        break
-      }
-
-      case 'skeptic:decision': {
-        const player = this.storage.players.find((p) => p.userId === userId)
-        if (!player || player.role !== 'skeptic') return
-        // Only allow decision during persuasion or decision phases
-        if (this.storage.phase !== 'persuasion' && this.storage.phase !== 'decision') return
-        player.decision = event.decision
-        player.trustedSeerId = event.trusted_seer_id
+        if (allLocked) await this.doReveal()
         break
       }
     }
@@ -549,7 +495,6 @@ export class RoomState extends DurableObject {
 
     const cardId = this.storage.cardIds[this.storage.roundIndex]
     this.storage.currentCardId = cardId
-    this.storage.currentSpeakerIndex = 0
 
     const db = this.env.DB
     const card = await db.prepare(
@@ -629,24 +574,12 @@ export class RoomState extends DurableObject {
       return
     }
 
-    const skepticIdx = this.storage.skepticIndex % connectedPlayers.length
-    this.storage.skepticIndex++
-
-    if (this.storage.mode === 'seer_skeptic') {
-      // Seer & Skeptic mode supports exactly one skeptic and one seer.
-      // Any extra connected players (e.g. a mid-game join) are marked
-      // 'solo' so a 2p game can never end up with multiple seers.
-      const seerIdx = connectedPlayers.length > 1 ? (skepticIdx + 1) % connectedPlayers.length : -1
-      for (let i = 0; i < connectedPlayers.length; i++) {
-        if (i === skepticIdx) connectedPlayers[i].role = 'skeptic'
-        else if (i === seerIdx) connectedPlayers[i].role = 'seer'
-        else connectedPlayers[i].role = 'solo'
-      }
-      return
-    }
-
+    // Seer modes: exactly ONE seer per round (rotates round-robin); everyone
+    // else is a skeptic who can follow the seer or go solo.
+    const seerIdx = this.storage.seerIndex % connectedPlayers.length
+    this.storage.seerIndex++
     for (let i = 0; i < connectedPlayers.length; i++) {
-      connectedPlayers[i].role = i === skepticIdx ? 'skeptic' : 'seer'
+      connectedPlayers[i].role = i === seerIdx ? 'seer' : 'skeptic'
     }
   }
 
@@ -656,8 +589,7 @@ export class RoomState extends DurableObject {
     const tokensAwarded: Record<string, number> = {}
     const isCorrectMap: Record<string, boolean> = {}
     const decisions: Record<string, Decision> = {}
-    const seerIds: string[] = []
-    let skepticId: string | undefined
+    let seerId: string | undefined
 
     const activePlayers = this.storage.players.filter((p) =>
       p.connected || p.pick !== undefined || p.tokens > 0
@@ -666,18 +598,14 @@ export class RoomState extends DurableObject {
     for (const p of activePlayers) {
       isCorrectMap[p.userId] = p.pick === correctCategoryId
       if (p.decision) decisions[p.userId] = p.decision
-      if (p.role === 'seer') seerIds.push(p.userId)
-      if (p.role === 'skeptic') skepticId = p.userId
+      if (p.role === 'seer') seerId = p.userId
     }
 
-    const skeptic = this.storage.players.find((p) => p.role === 'skeptic')
     const result = computeScores({
       mode: this.storage.mode,
       isCorrect: isCorrectMap,
       decisions,
-      trustedSeerId: skeptic?.trustedSeerId,
-      seerIds,
-      skepticId,
+      seerId,
       allPlayerIds: activePlayers.map((p) => p.userId),
     })
 
@@ -746,7 +674,7 @@ export class RoomState extends DurableObject {
 
       for (const p of this.storage.players) {
         if (!p.connected && p.pick === undefined && tokensAwarded[p.userId] === undefined) continue
-        const decisionMap: Record<string, string> = { follow: 'followed_seer', bluff: 'called_bluff', solo: 'went_solo' }
+        const decisionMap: Record<string, string> = { follow: 'followed_seer', solo: 'went_solo' }
         await db.prepare(
           `INSERT INTO round_answers (round_id, user_id, chosen_category_id, decision_type, trusted_seer_id, is_correct, tokens_awarded, locked_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
@@ -788,39 +716,11 @@ export class RoomState extends DurableObject {
   async alarm() {
     if (this.storage.phase === 'statement_revealed') {
       if (this.storage.timerEnd && Date.now() >= this.storage.timerEnd) {
-        if (this.storage.mode === 'solo') {
-          for (const p of this.storage.players) {
-            if (!p.locked && p.connected) {
-              p.locked = true
-              p.pick = p.pick || this.storage.categoryOptions[0]?.id
-            }
-          }
-          await this.doReveal()
-        } else {
-          this.storage.phase = 'persuasion'
-          this.storage.currentSpeakerIndex = 0
-          this.storage.timerEnd = Date.now() + this.storage.timerSeconds * 1000
-          this.broadcast({ type: 'phase:changed', phase: 'persuasion', timerEnd: this.storage.timerEnd })
-          const seers = this.storage.players.filter((p) => p.role === 'seer')
-          if (seers.length > 0) {
-            this.broadcast({ type: 'round:turn', speakingUserId: seers[0].userId })
-          }
-          this.ctx.storage.setAlarm(this.storage.timerEnd)
-        }
-      }
-    } else if (this.storage.phase === 'persuasion') {
-      if (this.storage.timerEnd && Date.now() >= this.storage.timerEnd) {
-        this.storage.phase = 'decision'
-        this.storage.timerEnd = Date.now() + this.storage.timerSeconds * 1000
-        this.broadcast({ type: 'phase:changed', phase: 'decision', timerEnd: this.storage.timerEnd })
-        this.ctx.storage.setAlarm(this.storage.timerEnd)
-      }
-    } else if (this.storage.phase === 'decision') {
-      if (this.storage.timerEnd && Date.now() >= this.storage.timerEnd) {
         for (const p of this.storage.players) {
           if (!p.locked && p.connected) {
             p.locked = true
             p.pick = p.pick || this.storage.categoryOptions[0]?.id
+            p.decision = p.role === 'seer' ? undefined : 'solo'
           }
         }
         await this.doReveal()
@@ -901,7 +801,9 @@ export class RoomState extends DurableObject {
 
   private getSanitizedState() {
     const afterReveal = this.storage.phase === 'reveal' || this.storage.phase === 'leaderboard' || this.storage.phase === 'game_ended'
-    const pickVisible = afterReveal || this.storage.phase === 'persuasion' || this.storage.phase === 'decision'
+    // The seer's pick is public once locked so others can choose to follow.
+    const pickVisibleFor = (p: PlayerState) =>
+      afterReveal || (p.role === 'seer' && this.storage.phase === 'statement_revealed')
     return {
       roomId: this.storage.roomId,
       code: this.storage.code,
@@ -917,8 +819,9 @@ export class RoomState extends DurableObject {
         role: p.role,
         locked: p.locked,
         tokens: p.tokens,
-        pick: pickVisible ? p.pick : undefined,
+        pick: pickVisibleFor(p) ? p.pick : undefined,
         decision: afterReveal ? p.decision : undefined,
+        trustedSeerId: afterReveal ? p.trustedSeerId : undefined,
       })),
       roundIndex: this.storage.roundIndex,
       currentCardId: this.storage.currentCardId,
@@ -928,9 +831,7 @@ export class RoomState extends DurableObject {
       deckId: this.storage.deckId,
       timerSeconds: this.storage.timerSeconds,
       timerEnd: this.storage.timerEnd,
-      speakingUserId: this.storage.phase === 'persuasion'
-        ? this.storage.players.filter((p) => p.role === 'seer')[this.storage.currentSpeakerIndex]?.userId
-        : undefined,
+      maxRounds: this.storage.maxRounds,
     }
   }
 
@@ -942,7 +843,6 @@ export class RoomState extends DurableObject {
       players: s.players.map((p: any) => ({
         ...p,
         ready: false,
-        pick: s.phase === 'reveal' || s.phase === 'leaderboard' || s.phase === 'game_ended' ? p.pick : undefined,
         decision: s.phase === 'reveal' || s.phase === 'leaderboard' || s.phase === 'game_ended' ? p.decision : undefined,
       })),
     }
